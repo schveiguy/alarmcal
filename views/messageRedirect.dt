@@ -1,0 +1,6 @@
+doctype html
+body
+  h1 #{result}
+  p #{message}
+  p
+    a(href="/") Home

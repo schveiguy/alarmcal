@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/alarmcal
+*.sqlite
+libalarmcal.so
+libalarmcal.dylib
+alarmcal.dll
+libalarmcal.a
+alarmcal.lib
+alarmcal-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

@@ -1,0 +1,13 @@
+doctype html
+include form
+head
+  link(href="/assets/css/index.css", rel="stylesheet")
+body
+  h1 Add Person
+
+  form(method="POST", action="/performAddPerson")
+    section
+      - import alarmcal.db;
+      - createForm!Person();
+    .form-group
+      button(type="submit") Submit

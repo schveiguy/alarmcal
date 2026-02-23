@@ -1,0 +1,15 @@
+doctype html
+include form
+head
+  link(href="/assets/css/index.css", rel="stylesheet")
+body
+  h1 Add Event
+
+  form(method="POST", action="/performAddEvent")
+    section
+      - import alarmcal.db;
+      - auto defaultTime = cast(DateTime)Clock.currTime;
+      - defaultTime.second = 0;
+      - createForm(Event(start: defaultTime, end: defaultTime));
+    .form-group
+      button(type="submit") Submit

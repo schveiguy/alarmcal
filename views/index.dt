@@ -1,0 +1,95 @@
+doctype html
+head
+  style.
+    td.day_num {
+      width: 100px;
+      text-align: center;
+      border: 1px solid grey;
+      background: lightgrey;
+    }
+    td.day {
+      width: 100px;
+      height: 50px;
+      border: 1px solid black;
+    }
+    td.unused_day {
+      width: 100px;
+      height: 50px;
+    }
+    td.unused_day_num {
+      width: 100px;
+    }
+    table.cal_table {
+      border-spacing: 0;
+      border-collapse: collapse;
+    }
+    table.cal_table tr td {
+      padding-top: 5px;
+    }
+    table.cal_table td.day.today {
+      background-color: lightyellow;
+    }
+    table.cal_table td.day_num.today {
+      background-color: yellow;
+    }
+body
+  - import std.datetime;
+  - import alarmcal.dietutils;
+  - import std.traits;
+  - alias DisplayStyle = typeof(model.params.style);
+  p Hello, #{currentUser.name}
+  form(action="/", method="GET", onchange="this.submit()")
+    label(id="my_events") My events
+    input(type="checkbox", name="my_events", checked=(model.params.my_events), value="true")
+    select(name="style")
+      - foreach(style; EnumMembers!DisplayStyle)
+        option(value=(style), selected=(model.params.style == style)) #{style}
+  h1 4H-Alarm Team 2079 Activity Calendar
+  - auto today = cast(Date)Clock.currTime();
+  - foreach(mon; model.cal)
+    h3 #{mon[0][$-1].get.date.month} #{mon[0][$-1].get.date.year}
+    - if(model.params.style == DisplayStyle.calendar)
+      table.cal_table
+        - foreach(wr; mon)
+          tr
+            - foreach(d; wr)
+              - if(d.isNull)
+                td.unused_day_num &nbsp;
+              - else
+                td.day_num(class='#{d.get.date == today ? "today" : ""}') #{d.get.date.day}
+          tr
+            - foreach(d; wr)
+              - if(d.isNull)
+                td.unused_day &nbsp;
+              - else
+                td.day(class='#{d.get.date == today ? "today" : ""}')
+                  - foreach(ev; d.get.events)
+                    p
+                      | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
+                      button >
+    - else
+      - foreach(wr; mon)
+        - foreach(d; wr)
+          - if(d.isNull || d.get.events.length == 0) continue;
+          div.event_list_day
+            h4
+              | #{d.get.date.dayOfWeek} #{d.get.date.day}
+              - if(d.get.date == today)
+                | (TODAY)
+            - foreach(ev; d.get.events)
+              p #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
+              - bool imGoing=false;
+              - foreach(att; ev.attendees)
+                - auto p = model.people[att.person_id];
+                - if (p.id == currentUser.id) imGoing = true;
+                p.attendee
+                  | #{p.name} - #{p.membertype} 
+                  - if(att.attendanceRecorded)
+                    | (checked in)
+                  - else if(d.get.date == today)
+                    | (not seen yet)
+                  - else if(d.get.date < today)
+                    | (absent)
+              div
+                | RSVP: 
+                a.button(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}") #{imGoing? "Cancel" : "Attend"}

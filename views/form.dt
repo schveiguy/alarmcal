@@ -1,0 +1,54 @@
+- import alarmcal.formudas;
+- import alarmcal.dietutils;
+- import sqlbuilder.uda;
+- import std.traits;
+- import std.datetime;
+- void formFieldNum(T)(string name, string prefix, T defaultVal)
+  input(type="number", value=defaultVal, name="#{prefix}#{name}")
+
+- void formFieldString(string name, string prefix, string defaultVal)
+  input(type="text", value=defaultVal, name="#{prefix}#{name}")
+
+- void formFieldPassword(string name, string prefix, string defaultVal)
+  input(type="password", value=defaultVal, name="#{prefix}#{name}")
+
+- void formFieldEnum(T)(string name, string prefix, T defaultVal)
+  select(name="#{prefix}#{name}")
+    - static foreach(v; EnumMembers!T)
+      option(value=v, selected=(defaultVal == v)) #{v}
+
+- void formFieldDBEnum(T)(string name, string prefix, T[] options, long defaultVal)
+  select(name="#{prefix}#{name}")
+    - foreach(v; options)
+      option(value=(v.id), selected=(defaultVal == v.id)) #{v.name}
+
+- void formFieldDateTime(string name, string prefix, DateTime defaultVal)
+  fieldset.datetime-group
+    input(type="date", value=(defaultVal.date.datePrinter), name="#{prefix}#{name}_d")
+    input(type="time", value=(defaultVal.timeOfDay), name="#{prefix}#{name}_t")
+
+- void formField(T)(string name, string prefix, T defaultVal)
+  div.form-group
+    label #{name}
+    - static if(is(T == enum))
+      - formFieldEnum(name, prefix, defaultVal);
+    - else static if(isNumeric!T)
+      - formFieldNum(name, prefix, defaultVal);
+    - else static if(is(T == string))
+      - formFieldString(name, prefix, defaultVal);
+    - else static if(is(T == DateTime))
+      - formFieldDateTime(name, prefix, defaultVal);
+
+- void createForm(T, string prefix="")(T defaultVal = T.init)
+  - static foreach(idx; 0 .. T.tupleof.length)
+    - static if(!hasUDA!(T.tupleof[idx], autoIncrement) && !hasUDA!(T.tupleof[idx], noform))
+      - static if(isIntegral!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], dbenum))
+        .form-group
+          label #{__traits(identifier, T.tupleof[idx])}
+          - formFieldDBEnum(__traits(identifier, T.tupleof[idx]), prefix, getDBEnumValues!(getUDAs!(T.tupleof[idx], dbenum)[0].Type), defaultVal.tupleof[idx]);
+      - else static if(isSomeString!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], password))
+        .form-group
+          label #{__traits(identifier, T.tupleof[idx])}
+          - formFieldPassword(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
+      - else
+        - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
