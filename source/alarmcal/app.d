@@ -229,6 +229,11 @@ struct IndexViewModel {
     Nullable!CalendarDay[][][] cal;
 }
 
+void messageRedirect(Output output, string result, string message)
+{
+    output.renderDiet!("messageRedirect.dt", result, message);
+}
+
 @endpoint
 @getRoute!"/"
 void index(Request request, Output output)
@@ -265,12 +270,20 @@ void index(Request request, Output output)
 @endpoint
 @getRoute!"/addEvent"
 void addEventForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can add a new event");
+    }
     output.renderDiet!("addEvent.dt");
 }
 
 @endpoint
 @postRoute!"/performAddEvent"
 void performAddEvent(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can add a new event");
+    }
     auto e = request.post.extract!Event();
     db.create(e);
     infof("Created event %s of type %s at location id %s, starting at %s ending at %s (min students %s, max students %s, min adults %s)",
@@ -282,12 +295,20 @@ void performAddEvent(Request request, Output output) {
 @endpoint
 @getRoute!"/addPerson"
 void addPersonForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can add a person");
+    }
     output.renderDiet!("addPerson.dt");
 }
 
 @endpoint
 @postRoute!"/performAddPerson"
 void performAddPerson(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can add a person");
+    }
     auto p = request.post.extract!Person();
     import std.stdio;
     db.create(p);
@@ -298,12 +319,20 @@ void performAddPerson(Request request, Output output) {
 @endpoint
 @getRoute!"/addLocation"
 void addLocationForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can add a location");
+    }
     output.renderDiet!("addLocation.dt");
 }
 
 @endpoint
 @postRoute!"/performAddLocation"
 void performAddLocation(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can add a location");
+    }
     auto l = request.post.extract!Location();
     db.create(l);
     infof("Created location %s at address %s", l.name, l.address);
@@ -351,21 +380,13 @@ void checkIn(Request request, Output output) {
         auto eventInfo = db.fetchOne(select(count(ds.id), exprCol!(Nullable!long)("SUM(", ds.attendanceRecorded, ")")).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
         if(eventInfo[0] == 0) {
             import std.format;
-            enum result = "Invalid checkin";
-            auto message = format("No events at location %s, please RSVP for an event here before attempting to check in.", db.fetchUsingKey!Location(p.location_id).name);
-            output.renderDiet!("messageRedirect.dt", result, message);
+            return output.messageRedirect("Invalid checkin", format("No events at location %s, please RSVP for an event here before attempting to check in.", db.fetchUsingKey!Location(p.location_id).name));
         }
         else if(eventInfo[1] == eventInfo[0]) {
-            enum result = "Already checked in";
-            auto message = "You have already checked in for today's event(s). No need to checkin again";
-            output.renderDiet!("messageRedirect.dt", result, message);
+            return output.messageRedirect("Already checked in", "You have already checked in for today's event(s). No need to checkin again");
         }
-        else {
-            db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
-            enum result = "Checked in";
-            auto message = "Thanks for checking in for today's event(s)!";
-            output.renderDiet!("messageRedirect.dt", result, message);
-        }
+        db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
+        return output.messageRedirect("Checked in", "Thanks for checking in for today's event(s)!");
     } else if(p.event_id != -1) {
         db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
     } else {

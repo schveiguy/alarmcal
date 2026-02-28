@@ -34,6 +34,7 @@ struct Person
     string name;
     string email;
     @password string password_hash;
+    bool admin;
 
     static @mapping("person_id") @refersTo!PersonEvent Relation events;
 }
