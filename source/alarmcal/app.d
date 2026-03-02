@@ -24,16 +24,17 @@ int cliAddUser(string[] args) {
     auto db = openDB();
     import std.conv : to;
     // args: name email password membertype
-    enforce(args.length == 4, "usage: cli addUser name email password membertype");
+    enforce(args.length >= 4 && args.length <= 5, "usage: cli addUser name email password membertype [admin]");
     auto p = Person(
             name: args[0],
             email: args[1],
             password_hash: getPasswordHash(args[2]),
             membertype: args[3].to!MemberType,
+            admin: args.length > 4 && args[4] == "admin",
             );
     db.create(p);
     import std.stdio;
-    writeln(i"Added user id $(p.id) with name '$(p.name)', email '$(p.email)', member type $(p.membertype)");
+    writeln(i"Added user id $(p.id) with name '$(p.name)', email '$(p.email)', member type $(p.membertype), admin = $(p.admin)");
     return 0;
 }
 

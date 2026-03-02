@@ -19,9 +19,9 @@ Run the server directly after building:
 ./alarmcal         # starts HTTP server on 127.0.0.1:8080
 ```
 
-Add a user via the CLI (the only way to create accounts — there is no signup route):
+Add a user via the CLI (admins can also add users through the `/addPerson` route)
 ```sh
-./alarmcal cli addUser <name> <email> <password> <membertype>
+./alarmcal cli addUser <name> <email> <password> <membertype> [admin]
 # membertype: student | parent | mentor
 ```
 
