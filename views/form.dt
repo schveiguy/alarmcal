@@ -27,9 +27,9 @@
     input(type="date", value=(defaultVal.date.datePrinter), name="#{prefix}#{name}_d")
     input(type="time", value=(defaultVal.timeOfDay), name="#{prefix}#{name}_t")
 
-- void formField(T)(string name, string prefix, T defaultVal)
+- void formField(T)(string name, string prefix, T defaultVal, string labelText)
   div.form-group
-    label #{name}
+    label #{labelText}
     - static if(is(T == enum))
       - formFieldEnum(name, prefix, defaultVal);
     - else static if(isNumeric!T)
@@ -44,11 +44,11 @@
     - static if(!hasUDA!(T.tupleof[idx], autoIncrement) && !hasUDA!(T.tupleof[idx], noform))
       - static if(isIntegral!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], dbenum))
         .form-group
-          label #{__traits(identifier, T.tupleof[idx])}
+          label #{getFieldLabel!(T.tupleof[idx])}
           - formFieldDBEnum(__traits(identifier, T.tupleof[idx]), prefix, getDBEnumValues!(getUDAs!(T.tupleof[idx], dbenum)[0].Type), defaultVal.tupleof[idx]);
       - else static if(isSomeString!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], password))
         .form-group
-          label #{__traits(identifier, T.tupleof[idx])}
+          label #{getFieldLabel!(T.tupleof[idx])}
           - formFieldPassword(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
       - else
-        - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
+        - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));

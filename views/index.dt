@@ -92,7 +92,7 @@ body(data-admin=(currentUser.admin ? "true" : "false"))
                   - foreach(ev; d.get.events)
                     - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
                     - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "INVALID LOCATION";
-                    - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].membertype.to!string, att.attendanceRecorded));
+                    - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, att.attendanceRecorded));
                     p
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
                       button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &gt;
@@ -108,14 +108,14 @@ body(data-admin=(currentUser.admin ? "true" : "false"))
             - foreach(ev; d.get.events)
               - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
               - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
-              - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].membertype.to!string, att.attendanceRecorded));
+              - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, att.attendanceRecorded));
               p
                 | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
               - foreach(att; ev.attendees)
                 - imGoing = imGoing || att.person_id == currentUser.id;
                 - auto p = model.people[att.person_id];
                 p.attendee
-                  | #{p.name} - #{p.membertype}
+                  | #{p.name} - #{p.memberType}
                   - if(att.attendanceRecorded)
                     | (checked in)
                   - else if(d.get.date == today)

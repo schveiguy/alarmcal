@@ -30,10 +30,10 @@ enum MemberType {
 struct Person
 {
     @primaryKey @autoIncrement int id = -1;
-    MemberType membertype;
+    MemberType memberType;
     string name;
     string email;
-    @password string password_hash;
+    @password @label("Password") string password_hash;
     bool admin;
 
     static @mapping("person_id") @refersTo!PersonEvent Relation events;
