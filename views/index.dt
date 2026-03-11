@@ -47,8 +47,9 @@ head
     .admin_tool:hover {
       background-color: #46a;
     }
+  link(rel="stylesheet", href="/assets/css/eventpopup.css")
   script(src="/assets/js/eventpopup.js")
-body(data-admin="#{currentUser.admin}")
+body(data-admin=(currentUser.admin ? "true" : "false"))
   - import std.datetime;
   - import alarmcal.dietutils;
   - import std.traits;
@@ -90,11 +91,11 @@ body(data-admin="#{currentUser.admin}")
                 td.day(class='#{d.get.date == today ? "today" : ""}')
                   - foreach(ev; d.get.events)
                     - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
-                    - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
+                    - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "INVALID LOCATION";
                     - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].membertype.to!string, att.attendanceRecorded));
                     p
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type.to!string), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &gt;
+                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &gt;
     - else
       - foreach(wr; mon)
         - foreach(d; wr)
@@ -110,8 +111,8 @@ body(data-admin="#{currentUser.admin}")
               - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].membertype.to!string, att.attendanceRecorded));
               p
                 | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type.to!string), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &gt;
               - foreach(att; ev.attendees)
+                - imGoing = imGoing || att.person_id == currentUser.id;
                 - auto p = model.people[att.person_id];
                 p.attendee
                   | #{p.name} - #{p.membertype}
@@ -122,5 +123,7 @@ body(data-admin="#{currentUser.admin}")
                   - else if(d.get.date < today)
                     | (absent)
               div
-                | RSVP:
-                a.button(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}") #{imGoing ? "Cancel" : "Attend"}
+                a.em-button(class='#{imGoing ? "em-cancel-rsvp" : "em-rsvp"}', href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}") #{imGoing ? "Cancel RSVP" : "RSVP"}
+                - if(currentUser.admin)
+                  | &nbsp;
+                  a.em-button.em-edit(href="/editEvent?event_id=#{ev.event.id}") Edit Event

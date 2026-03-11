@@ -1,0 +1,61 @@
+#event-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+#event-modal-overlay.open {
+  display: flex;
+}
+
+#event-modal {
+  background: #fff;
+  border-radius: 6px;
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 4px 24px rgba(0,0,0,.3);
+}
+
+.em-close {
+  position: absolute;
+  top: .5rem;
+  right: .75rem;
+  background: none;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+}
+
+.em-title { margin: 0 2rem .5rem 0; font-size: 1.2rem; }
+.em-meta { margin: .2rem 0; font-size: .9rem; }
+
+.em-attendees { margin-top: .75rem; }
+.em-attendees h4 { margin: 0 0 .25rem; }
+.em-attendees ul { margin: 0; padding-left: 1.25rem; font-size: .9rem; }
+
+.em-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.em-actions a, a.em-button {
+  padding: .4rem .9rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: .9rem;
+  display: inline-block;
+}
+
+.em-rsvp        { background: #3a7; color: #fff; }
+.em-cancel-rsvp { background: #c55; color: #fff; }
+.em-edit        { background: #57b; color: #fff; }
