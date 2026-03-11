@@ -189,6 +189,13 @@ Person[int] getPersonMap() {
     return result;
 }
 
+Location[int] getLocationMap() {
+    DataSet!Location ds;
+    Location[int] result;
+    foreach(l; db.fetch(select(ds))) result[l.id] = l;
+    return result;
+}
+
 // TODO: use sessions instead of basic auth?
 @priority(10)
 @endpoint
@@ -227,6 +234,7 @@ struct IndexViewModel {
     }
     Params params;
     Person[int] people;
+    Location[int] locations;
     Nullable!CalendarDay[][][] cal;
 }
 
@@ -265,6 +273,7 @@ void index(Request request, Output output)
         minDate.add!"months"(1);
     }
     model.people = getPersonMap();
+    model.locations = getLocationMap();
     output.renderDiet!("index.dt", model, currentUser);
 }
 
@@ -400,6 +409,12 @@ void checkIn(Request request, Output output) {
 @getRoute!"/assets/css/index.css"
 void indexCss(Request request, Output output) {
     output.serveStaticFile("views/index.css", "text/css; charset=utf-8");
+}
+
+@endpoint
+@getRoute!"/assets/js/eventpopup.js"
+void eventPopupJs(Request request, Output output) {
+    output.serveStaticFile("views/eventpopup.js", "text/javascript; charset=utf-8");
 }
 
 

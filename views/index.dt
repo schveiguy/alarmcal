@@ -34,14 +34,27 @@ head
     }
     .admin_tool {
       display: inline-block;
-      padding-left: 5px;
-      padding-right: 5px;
-      border-left: 1px solid black;
+      padding: 4px 10px;
+      margin-left: 4px;
+      background-color: #57b;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      cursor: pointer;
     }
-body
+    .admin_tool:hover {
+      background-color: #46a;
+    }
+  script(src="/assets/js/eventpopup.js")
+body(data-admin="#{currentUser.admin}")
   - import std.datetime;
   - import alarmcal.dietutils;
   - import std.traits;
+  - import std.algorithm : map, any;
+  - import std.conv : to;
+  - import std.format : format;
   - alias DisplayStyle = typeof(model.params.style);
   p Hello, #{currentUser.name}
   - if(currentUser.admin)
@@ -76,9 +89,12 @@ body
               - else
                 td.day(class='#{d.get.date == today ? "today" : ""}')
                   - foreach(ev; d.get.events)
+                    - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
+                    - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
+                    - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].membertype.to!string, att.attendanceRecorded));
                     p
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                      button >
+                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type.to!string), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &gt;
     - else
       - foreach(wr; mon)
         - foreach(d; wr)
@@ -89,13 +105,16 @@ body
               - if(d.get.date == today)
                 | (TODAY)
             - foreach(ev; d.get.events)
-              p #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-              - bool imGoing=false;
+              - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
+              - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
+              - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].membertype.to!string, att.attendanceRecorded));
+              p
+                | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
+                button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type.to!string), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &gt;
               - foreach(att; ev.attendees)
                 - auto p = model.people[att.person_id];
-                - if (p.id == currentUser.id) imGoing = true;
                 p.attendee
-                  | #{p.name} - #{p.membertype} 
+                  | #{p.name} - #{p.membertype}
                   - if(att.attendanceRecorded)
                     | (checked in)
                   - else if(d.get.date == today)
@@ -103,5 +122,5 @@ body
                   - else if(d.get.date < today)
                     | (absent)
               div
-                | RSVP: 
-                a.button(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}") #{imGoing? "Cancel" : "Attend"}
+                | RSVP:
+                a.button(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}") #{imGoing ? "Cancel" : "Attend"}
