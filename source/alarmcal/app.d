@@ -355,6 +355,7 @@ void rsvp(Request request, Output output) {
     static struct params {
         int event_id;
         bool attending;
+        @(form.optional) string style;
     }
     auto p = request.get.extract!params;
     // check if the rsvp already exists
@@ -372,7 +373,7 @@ void rsvp(Request request, Output output) {
                     event_id: p.event_id,
                     ));
     }
-    output.redirect("/");
+    output.redirect(p.style.length ? "/?style=" ~ p.style : "/");
 }
 
 @endpoint

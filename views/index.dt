@@ -123,7 +123,7 @@ body(data-admin=(currentUser.admin ? "true" : "false"))
                   - else if(d.get.date < today)
                     | (absent)
               div
-                a.em-button(class='#{imGoing ? "em-cancel-rsvp" : "em-rsvp"}', href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}") #{imGoing ? "Cancel RSVP" : "RSVP"}
+                a.em-button(class='#{imGoing ? "em-cancel-rsvp" : "em-rsvp"}', href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") #{imGoing ? "Cancel RSVP" : "RSVP"}
                 - if(currentUser.admin)
                   | &nbsp;
                   a.em-button.em-edit(href="/editEvent?event_id=#{ev.event.id}") Edit Event
