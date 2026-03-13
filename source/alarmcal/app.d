@@ -284,7 +284,7 @@ void addEventForm(Request request, Output output) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a new event");
     }
-    output.renderDiet!("addEvent.dt");
+    output.renderDiet!("addEvent.dt", currentUser);
 }
 
 @endpoint
@@ -309,7 +309,7 @@ void addPersonForm(Request request, Output output) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a person");
     }
-    output.renderDiet!("addPerson.dt");
+    output.renderDiet!("addPerson.dt", currentUser);
 }
 
 @endpoint
@@ -333,7 +333,7 @@ void addLocationForm(Request request, Output output) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a location");
     }
-    output.renderDiet!("addLocation.dt");
+    output.renderDiet!("addLocation.dt", currentUser);
 }
 
 @endpoint
@@ -410,6 +410,12 @@ void checkIn(Request request, Output output) {
 @getRoute!"/assets/css/index.css"
 void indexCss(Request request, Output output) {
     output.serveStaticFile("views/index.css", "text/css; charset=utf-8");
+}
+
+@endpoint
+@getRoute!"/assets/css/alarmcal.css"
+void alarmcalCss(Request request, Output output) {
+    output.serveStaticFile("views/alarmcal.css", "text/css; charset=utf-8");
 }
 
 @endpoint

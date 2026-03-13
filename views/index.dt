@@ -1,55 +1,8 @@
-doctype html
-head
-  style.
-    td.day_num {
-      width: 100px;
-      text-align: center;
-      border: 1px solid grey;
-      background: lightgrey;
-    }
-    td.day {
-      width: 100px;
-      height: 50px;
-      border: 1px solid black;
-    }
-    td.unused_day {
-      width: 100px;
-      height: 50px;
-    }
-    td.unused_day_num {
-      width: 100px;
-    }
-    table.cal_table {
-      border-spacing: 0;
-      border-collapse: collapse;
-    }
-    table.cal_table tr td {
-      padding-top: 5px;
-    }
-    table.cal_table td.day.today {
-      background-color: lightyellow;
-    }
-    table.cal_table td.day_num.today {
-      background-color: yellow;
-    }
-    .admin_tool {
-      display: inline-block;
-      padding: 4px 10px;
-      margin-left: 4px;
-      background-color: #57b;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      text-decoration: none;
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-    .admin_tool:hover {
-      background-color: #46a;
-    }
+extends layout
+block extraHead
   link(rel="stylesheet", href="/assets/css/eventpopup.css")
   script(src="/assets/js/eventpopup.js")
-body(data-admin=(currentUser.admin ? "true" : "false"))
+block content
   - import std.datetime;
   - import alarmcal.dietutils;
   - import std.traits;
@@ -58,12 +11,6 @@ body(data-admin=(currentUser.admin ? "true" : "false"))
   - import std.format : format;
   - alias DisplayStyle = typeof(model.params.style);
   p Hello, #{currentUser.name}
-  - if(currentUser.admin)
-    div
-      | Admin tools 
-      a.admin_tool(href="/addPerson") Add Person
-      a.admin_tool(href="/addEvent") Add Event
-      a.admin_tool(href="/addLocation") Add Location
   form(action="/", method="GET", onchange="this.submit()")
     label(id="my_events") My events
     input(type="checkbox", name="my_events", checked=(model.params.my_events), value="true")

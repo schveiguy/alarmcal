@@ -1,0 +1,15 @@
+doctype html
+head
+  title 4H Alarm Calendar
+  link(rel="stylesheet", href="/assets/css/alarmcal.css")
+  block extraHead
+body(data-admin=(currentUser.admin ? "true" : "false"))
+  div
+    a.admin_tool(href="/") Home
+    - if(currentUser.admin)
+      | Admin tools 
+      a.admin_tool(href="/addPerson") Add Person
+      a.admin_tool(href="/addEvent") Add Event
+      a.admin_tool(href="/addLocation") Add Location
+  block content
+
