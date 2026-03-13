@@ -27,6 +27,11 @@
     input(type="date", value=(defaultVal.date.datePrinter), name="#{prefix}#{name}_d")
     input(type="time", value=(defaultVal.timeOfDay), name="#{prefix}#{name}_t")
 
+- void formFieldBool(string name, string prefix, bool defaultVal, string labelText)
+  label
+    input(type="checkbox", checked=defaultVal, name="#{prefix}#{name}")
+    |  #{labelText}
+
 - void formField(T)(string name, string prefix, T defaultVal, string labelText)
   div.form-group
     label #{labelText}
@@ -38,6 +43,8 @@
       - formFieldString(name, prefix, defaultVal);
     - else static if(is(T == DateTime))
       - formFieldDateTime(name, prefix, defaultVal);
+    - else
+      - static assert(false, "Unhandled field type: " ~ T.stringof);
 
 - void createForm(T, string prefix="")(T defaultVal = T.init)
   - static foreach(idx; 0 .. T.tupleof.length)
@@ -50,5 +57,8 @@
         .form-group
           label #{getFieldLabel!(T.tupleof[idx])}
           - formFieldPassword(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
+      - else static if(is(typeof(T.tupleof[idx]) == bool))
+        .form-group
+          - formFieldBool(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));
       - else
         - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));

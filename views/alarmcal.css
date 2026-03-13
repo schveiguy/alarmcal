@@ -14,6 +14,10 @@ input {
     max-width: 800px;
 }
 
+input[type="checkbox"] {
+    width: auto;
+}
+
 fieldset.datetime-group input {
     width: 100%;
     max-width: 400px;
