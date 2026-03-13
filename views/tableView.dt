@@ -1,0 +1,28 @@
+- import alarmcal.formudas;
+- import alarmcal.dietutils;
+- import sqlbuilder.uda;
+- import std.traits;
+- import std.conv;
+- import std.datetime;
+
+- void tableView(T)(T[] items, string editRoute)
+  table.item-table
+    thead
+      tr
+        - static foreach(idx; 0 .. T.tupleof.length)
+          - static if(!hasUDA!(T.tupleof[idx], password))
+            th #{getFieldLabel!(T.tupleof[idx])}
+        th
+    tbody
+      - foreach(item; items)
+        tr
+          - static foreach(idx; 0 .. T.tupleof.length)
+            - static if(!hasUDA!(T.tupleof[idx], password))
+              - static if(is(typeof(T.tupleof[idx]) == bool))
+                td #{item.tupleof[idx] ? "Yes" : "No"}
+              - else static if(is(typeof(T.tupleof[idx]) == DateTime))
+                td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
+              - else
+                td #{item.tupleof[idx].to!string}
+          td
+            a(href="#{editRoute}?id=#{item.id}") Edit

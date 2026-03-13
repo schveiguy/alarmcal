@@ -1,0 +1,7 @@
+extends layout
+block content
+  include tableView
+  h1 Locations
+
+  - import alarmcal.db;
+  - tableView!Location(locations, "/editLocation");

@@ -69,3 +69,38 @@ table.cal_table td.day_num.today {
 .admin_tool:hover {
   background-color: #46a;
 }
+
+table.item-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+table.item-table th,
+table.item-table td {
+  padding: 6px 16px;
+  text-align: left;
+}
+
+table.item-table thead tr {
+  border-bottom: 2px solid #888;
+}
+
+table.item-table th {
+  background-color: #dde;
+}
+
+table.item-table tbody tr {
+  border-bottom: 1px solid #ccc;
+}
+
+table.item-table tbody tr:nth-child(odd) {
+  background-color: #f5f5f5;
+}
+
+table.item-table tbody tr:nth-child(even) {
+  background-color: #e8eaf0;
+}
+
+table.item-table tbody tr:hover {
+  background-color: #d8dff0;
+}

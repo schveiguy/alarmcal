@@ -1,0 +1,14 @@
+extends layout
+block content
+  include form
+  h1 Edit Person
+
+  - import alarmcal.db;
+  - auto displayItem = item;
+  - displayItem.password_hash = "";
+  form(method="POST", action="/performEditPerson")
+    input(type="hidden", name="id", value=(item.id))
+    section
+      - createForm!Person(displayItem);
+    .form-group
+      button(type="submit") Submit

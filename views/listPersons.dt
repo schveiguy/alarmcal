@@ -1,0 +1,7 @@
+extends layout
+block content
+  include tableView
+  h1 Persons
+
+  - import alarmcal.db;
+  - tableView!Person(persons, "/editPerson");

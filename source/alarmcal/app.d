@@ -350,6 +350,89 @@ void performAddLocation(Request request, Output output) {
 }
 
 @endpoint
+@getRoute!"/persons"
+void listPersonsRoute(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can view the person list");
+    }
+    import std.array;
+    DataSet!Person ds;
+    auto persons = db.fetch(select(ds)).array;
+    output.renderDiet!("listPersons.dt", currentUser, persons);
+}
+
+@endpoint
+@getRoute!"/editPerson"
+void editPersonForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit a person");
+    }
+    static struct params { int id; }
+    auto p = request.get.extract!params;
+    auto item = db.fetchUsingKey!Person(p.id);
+    output.renderDiet!("editPerson.dt", currentUser, item);
+}
+
+@endpoint
+@postRoute!"/performEditPerson"
+void performEditPerson(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit a person");
+    }
+    import std.conv : to;
+    auto rawPassword = request.post.read("password_hash");
+    auto p = request.post.extract!Person();
+    p.id = request.post.read("id").to!int;
+    if(rawPassword.length == 0)
+        p.password_hash = db.fetchUsingKey!Person(p.id).password_hash;
+    db.update(p);
+    output.redirect("/persons");
+}
+
+@endpoint
+@getRoute!"/locations"
+void listLocationsRoute(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can view the location list");
+    }
+    import std.array;
+    DataSet!Location ds;
+    auto locations = db.fetch(select(ds)).array;
+    output.renderDiet!("listLocations.dt", currentUser, locations);
+}
+
+@endpoint
+@getRoute!"/editLocation"
+void editLocationForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit a location");
+    }
+    static struct params { int id; }
+    auto p = request.get.extract!params;
+    auto item = db.fetchUsingKey!Location(p.id);
+    output.renderDiet!("editLocation.dt", currentUser, item);
+}
+
+@endpoint
+@postRoute!"/performEditLocation"
+void performEditLocation(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit a location");
+    }
+    import std.conv : to;
+    auto l = request.post.extract!Location();
+    l.id = request.post.read("id").to!int;
+    db.update(l);
+    output.redirect("/locations");
+}
+
+@endpoint
 @getRoute!"/rsvp"
 void rsvp(Request request, Output output) {
     static struct params {
