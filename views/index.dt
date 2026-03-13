@@ -12,8 +12,9 @@ block content
   - alias DisplayStyle = typeof(model.params.style);
   p Hello, #{currentUser.name}
   form(action="/", method="GET", onchange="this.submit()")
-    label(id="my_events") My events
-    input(type="checkbox", name="my_events", checked=(model.params.my_events), value="true")
+    label(id="my_events")
+      input(type="checkbox", name="my_events", checked=(model.params.my_events), value="true")
+      |  My events
     select(name="style")
       - foreach(style; EnumMembers!DisplayStyle)
         option(value=(style), selected=(model.params.style == style)) #{style}
