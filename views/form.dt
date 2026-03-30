@@ -10,7 +10,7 @@
   input(type="text", value=defaultVal, name="#{prefix}#{name}")
 
 - void formFieldPassword(string name, string prefix, string defaultVal)
-  input(type="password", value=defaultVal, name="#{prefix}#{name}")
+  input(type="password", name="#{prefix}#{name}", placeholder='#{defaultVal == null ? "" : "Leave blank to keep existing password"}')
 
 - void formFieldEnum(T)(string name, string prefix, T defaultVal)
   select(name="#{prefix}#{name}")
@@ -29,7 +29,7 @@
 
 - void formFieldBool(string name, string prefix, bool defaultVal, string labelText)
   label
-    input(type="checkbox", checked=defaultVal, name="#{prefix}#{name}")
+    input(type="checkbox", checked=defaultVal, name="#{prefix}#{name}", value="true")
     |  #{labelText}
 
 - void formField(T)(string name, string prefix, T defaultVal, string labelText)

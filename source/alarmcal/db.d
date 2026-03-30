@@ -248,11 +248,6 @@ void applyMigrations()
     }
 }
 
-// Update an existing item in the database by primary key.
-// TODO: fill in implementation
-void update(T)(Database db, T item) {
-}
-
 // helper function to get all values by name as if it were a database enum type.
 T[] getDBEnumValues(T)() {
     auto db = openDB();

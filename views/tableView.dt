@@ -23,6 +23,6 @@
               - else static if(is(typeof(T.tupleof[idx]) == DateTime))
                 td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
               - else
-                td #{item.tupleof[idx].to!string}
+                td #{item.tupleof[idx]}
           td
-            a(href="#{editRoute}?id=#{item.id}") Edit
+            a.em-button.em-edit(href="#{editRoute}?id=#{item.id}") Edit

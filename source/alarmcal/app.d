@@ -104,18 +104,29 @@ void extract(T, string prefix="")(Request.SafeAccess!string data, ref T target) 
     import sqlbuilder.uda;
     import std.stdio;
     import alarmcal.dietutils;
+    import std.string : strip;
 
     static foreach(idx; 0 .. T.tupleof.length) {{
         static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)){
             alias FT = typeof(target.tupleof[idx]);
             enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
             static if(hasUDA!(target.tupleof[idx], form.password)) {{
-                auto hash = getPasswordHash(data.read(formname).to!string);
-                target.tupleof[idx] = hash.to!FT;
+                auto pw = data.read(formname).to!string;
+                if (pw.strip.length == 0)
+                    // no password provided
+                    target.tupleof[idx] = null;
+                else {
+                    auto hash = getPasswordHash(pw);
+                    target.tupleof[idx] = hash.to!FT;
+                }
             }}
             else static if(is(FT == DateTime)) {
                 target.tupleof[idx] = DateTime(Date.fromISOExtString(data.read(formname ~ "_d")),
                         parseTime(data.read(formname ~ "_t")));
+            }
+            else static if(is(FT == bool)) {
+                // booleans are a checkbox, and only if they are checked is the value transmitted.
+                target.tupleof[idx] = data.read(formname, "false").to!bool;
             }
             else {
                 auto val = data.read(formname);
@@ -320,6 +331,11 @@ void performAddPerson(Request request, Output output) {
         return output.messageRedirect("Forbidden", "Only administrators can add a person");
     }
     auto p = request.post.extract!Person();
+    if(p.password_hash == null)
+    {
+        output.status = 400;
+        return output.messageRedirect("Forbidden", "Password required for adding a person");
+    }
     import std.stdio;
     db.create(p);
     infof("Created person named %s of type %s", p.name, p.memberType);
@@ -383,12 +399,11 @@ void performEditPerson(Request request, Output output) {
         return output.messageRedirect("Forbidden", "Only administrators can edit a person");
     }
     import std.conv : to;
-    auto rawPassword = request.post.read("password_hash");
     auto p = request.post.extract!Person();
     p.id = request.post.read("id").to!int;
-    if(rawPassword.length == 0)
+    if(p.password_hash == null)
         p.password_hash = db.fetchUsingKey!Person(p.id).password_hash;
-    db.update(p);
+    db.save(p);
     output.redirect("/persons");
 }
 
@@ -428,7 +443,7 @@ void performEditLocation(Request request, Output output) {
     import std.conv : to;
     auto l = request.post.extract!Location();
     l.id = request.post.read("id").to!int;
-    db.update(l);
+    db.save(l);
     output.redirect("/locations");
 }
 
