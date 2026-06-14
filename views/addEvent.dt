@@ -9,5 +9,59 @@ block content
       - auto defaultTime = cast(DateTime)Clock.currTime;
       - defaultTime.second = 0;
       - createForm(Event(start: defaultTime, end: defaultTime));
+    section
+      .form-group
+        label
+          input#repeat-checkbox(type="checkbox", name="repeat", value="true")
+          |  Repeat event
+      #repeat-options(style="display:none")
+        .form-group
+          label Repeat on days
+          .repeat-days
+            label
+              input(type="checkbox", name="repeat_sun", value="true")
+              |  Sunday
+            label
+              input(type="checkbox", name="repeat_mon", value="true")
+              |  Monday
+            label
+              input(type="checkbox", name="repeat_tue", value="true")
+              |  Tuesday
+            label
+              input(type="checkbox", name="repeat_wed", value="true")
+              |  Wednesday
+            label
+              input(type="checkbox", name="repeat_thu", value="true")
+              |  Thursday
+            label
+              input(type="checkbox", name="repeat_fri", value="true")
+              |  Friday
+            label
+              input(type="checkbox", name="repeat_sat", value="true")
+              |  Saturday
+        .form-group
+          label Repeat until (max 1 year from event start)
+          input#repeat-end(type="date", name="repeat_end")
     .form-group
       button(type="submit") Submit
+  script.
+    document.getElementById('repeat-checkbox').addEventListener('change', function() {
+      document.getElementById('repeat-options').style.display = this.checked ? 'block' : 'none';
+    });
+    document.querySelector('form').addEventListener('submit', function(e) {
+      var cb = document.getElementById('repeat-checkbox');
+      if (!cb.checked) return;
+      var days = ['repeat_sun','repeat_mon','repeat_tue','repeat_wed','repeat_thu','repeat_fri','repeat_sat'];
+      var anyDay = days.some(function(d) {
+        return document.querySelector('[name="' + d + '"]').checked;
+      });
+      if (!anyDay) {
+        e.preventDefault();
+        alert('Please select at least one day of the week to repeat on.');
+        return;
+      }
+      if (!document.getElementById('repeat-end').value) {
+        e.preventDefault();
+        alert('Please select an end date for the repeat.');
+      }
+    });

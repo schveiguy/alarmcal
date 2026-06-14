@@ -104,3 +104,8 @@ table.item-table tbody tr:nth-child(even) {
 table.item-table tbody tr:hover {
   background-color: #d8dff0;
 }
+
+.repeat-days label {
+  display: inline-block;
+  margin-right: 1em;
+}

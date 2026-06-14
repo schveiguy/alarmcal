@@ -312,6 +312,45 @@ void performAddEvent(Request request, Output output) {
     db.create(e);
     infof("Created event %s of type %s at location id %s, starting at %s ending at %s (min students %s, max students %s, min adults %s)",
             e.title, e.type, e.location_id, e.start, e.end, e.minStudents, e.maxStudents, e.minAdults);
+
+    import std.conv : to;
+    if (request.post.read("repeat", "false").to!bool) {
+        static immutable string[7] dayNames = [
+            "repeat_sun", "repeat_mon", "repeat_tue", "repeat_wed",
+            "repeat_thu", "repeat_fri", "repeat_sat"
+        ];
+        bool[7] repeatDays;
+        foreach (i, name; dayNames)
+            repeatDays[i] = request.post.read(name, "false").to!bool;
+
+        auto endDateStr = request.post.read("repeat_end");
+        if (endDateStr.length == 0) {
+            output.status = 400;
+            return output.messageRedirect("Error", "Repeat end date is required");
+        }
+        auto endDate = Date.fromISOExtString(endDateStr);
+        auto maxEndDate = e.start.date;
+        maxEndDate.add!"years"(1);
+        if (endDate > maxEndDate) {
+            output.status = 400;
+            return output.messageRedirect("Error", "Repeat end date must be within 1 year of the event start date");
+        }
+
+        auto duration = e.end - e.start;
+        auto curDate = e.start.date + 1.days;
+        while (curDate <= endDate) {
+            if (repeatDays[curDate.dayOfWeek]) {
+                Event repeated = e;
+                repeated.id = Event.init.id;
+                repeated.tag_id = nullable(e.id);
+                repeated.start = DateTime(curDate, e.start.timeOfDay);
+                repeated.end = repeated.start + duration;
+                db.create(repeated);
+            }
+            curDate += 1.days;
+        }
+    }
+
     output.redirect("/");
 }
 
