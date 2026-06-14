@@ -101,7 +101,7 @@ T extract(T, string prefix="")(Request.SafeAccess!string data) {
     return result;
 }
 
-void extract(T, string prefix="")(Request.SafeAccess!string data, ref T target) {
+void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target) {
     import std.traits;
     import std.conv;
     import sqlbuilder.uda;
@@ -126,6 +126,9 @@ void extract(T, string prefix="")(Request.SafeAccess!string data, ref T target) 
             else static if(is(FT == DateTime)) {
                 target.tupleof[idx] = DateTime(Date.fromISOExtString(data.read(formname ~ "_d")),
                         parseTime(data.read(formname ~ "_t")));
+            }
+            else static if(is(FT == Date)) {
+                target.tupleof[idx] = Date.fromISOExtString(data.read(formname));
             }
             else static if(is(FT == bool)) {
                 // booleans are a checkbox, and only if they are checked is the value transmitted.
@@ -304,48 +307,54 @@ void addEventForm(Request request, Output output) {
 @endpoint
 @postRoute!"/performAddEvent"
 void performAddEvent(Request request, Output output) {
+    import std.conv : to;
+    import std.algorithm : canFind;
     if(!currentUser.admin) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a new event");
     }
     auto e = request.post.extract!Event();
+    static struct Repeat {
+        bool sun, mon, tue, wed, thu, fri, sat;
+        Date end;
+        bool[7] days() => [sun, mon, tue, wed, thu, fri, sat];
+    }
+    bool doRepeat = request.post.read("repeat", "false").to!bool;
+    Repeat repeat;
+
+    if (doRepeat) {
+        request.post.extract!"repeat_"(repeat);
+        if(repeat.days[].canFind(true)) {
+            auto maxEndDate = e.start.date;
+            maxEndDate.add!"years"(1);
+            if (repeat.end > maxEndDate) {
+                output.status = 400;
+                return output.messageRedirect("Error", "Repeat end date must be within 1 year of the event start date");
+            }
+        }
+        else
+            // no repeat days were selected, ignore.
+            doRepeat = false;
+    }
+
+    // have everything we need, actually modify the database
     db.create(e);
-    infof("Created event %s of type %s at location id %s, starting at %s ending at %s (min students %s, max students %s, min adults %s)",
-            e.title, e.type, e.location_id, e.start, e.end, e.minStudents, e.maxStudents, e.minAdults);
+    infof("Created event %s (id:%s) of type %s at location id %s, starting at %s ending at %s (min students %s, max students %s, min adults %s)",
+            e.title, e.id, e.type, e.location_id, e.start, e.end, e.minStudents, e.maxStudents, e.minAdults);
 
-    import std.conv : to;
-    if (request.post.read("repeat", "false").to!bool) {
-        static immutable string[7] dayNames = [
-            "repeat_sun", "repeat_mon", "repeat_tue", "repeat_wed",
-            "repeat_thu", "repeat_fri", "repeat_sat"
-        ];
-        bool[7] repeatDays;
-        foreach (i, name; dayNames)
-            repeatDays[i] = request.post.read(name, "false").to!bool;
-
-        auto endDateStr = request.post.read("repeat_end");
-        if (endDateStr.length == 0) {
-            output.status = 400;
-            return output.messageRedirect("Error", "Repeat end date is required");
-        }
-        auto endDate = Date.fromISOExtString(endDateStr);
-        auto maxEndDate = e.start.date;
-        maxEndDate.add!"years"(1);
-        if (endDate > maxEndDate) {
-            output.status = 400;
-            return output.messageRedirect("Error", "Repeat end date must be within 1 year of the event start date");
-        }
-
+    if (doRepeat) {
         auto duration = e.end - e.start;
         auto curDate = e.start.date + 1.days;
-        while (curDate <= endDate) {
+        auto repeatDays = repeat.days;
+        while (curDate <= repeat.end) {
             if (repeatDays[curDate.dayOfWeek]) {
                 Event repeated = e;
-                repeated.id = Event.init.id;
+                repeated.id = 0;
                 repeated.tag_id = nullable(e.id);
                 repeated.start = DateTime(curDate, e.start.timeOfDay);
                 repeated.end = repeated.start + duration;
                 db.create(repeated);
+                infof("Created repeated event (id=%s) on %s", repeated.id, repeated.start);
             }
             curDate += 1.days;
         }
