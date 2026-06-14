@@ -45,6 +45,9 @@ int main(string[] args)
     import std.process : environment;
     import std.string : split;
 
+    // always apply migrations
+    applyMigrations();
+
     // intercept the "cli" subcommand
     if (args.length > 1 && args[1] == "cli")
     {

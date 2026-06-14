@@ -10,6 +10,7 @@ import std.digest.md;
 import std.logger;
 import std.format;
 static import std.file;
+import std.typecons;
 
 import d2sqlite3;
 
@@ -57,6 +58,7 @@ enum EventType {
 struct Event
 {
     @primaryKey @autoIncrement int id;
+    @noform @refersTo!Event("originalEvent") Nullable!int tag_id;
     string title;
     DateTime start;
     DateTime end;
@@ -66,6 +68,7 @@ struct Event
     int minStudents; // minimum students required to hold the event.
     int minAdults; // minimum adults required to hold the event (at least one mentor)
     static @mapping("event_id") @refersTo!PersonEvent Relation people;
+    static @mapping("tag_id") @refersTo!Event Relation repeatedEvents;
 }
 
 import std.traits;
@@ -89,6 +92,14 @@ struct MigrationRecord
 // set to true if newly created sqlite database, all migrations are
 // assumed to be applied.
 bool assumeAllMigrations;
+
+// helper function to get all values by name as if it were a database enum type.
+T[] getDBEnumValues(T)() {
+    auto db = openDB();
+    DataSet!T ds;
+    import std.array;
+    return db.fetch(select(ds).orderBy(ds.name)).array;
+}
 
 Database openDB()
 {
@@ -176,6 +187,7 @@ struct Migration
 void applyMigrations()
 {
     Migration[] migrations = [
+        addRepeatEventTags()
     ];
 
     auto db = openDB();
@@ -230,11 +242,11 @@ void applyMigrations()
             continue;
         if(assumeAllMigrations)
         {
-            info("Assuming migration %s - %s is applied", idx + 1, m.name);
+            infof("Assuming migration %s - %s is applied", idx + 1, m.name);
         }
         else
         {
-            info("Applying migration %s - %s", idx + 1, m.name);
+            infof("Applying migration %s - %s", idx + 1, m.name);
             foreach(ref it; m.items)
                 it.apply(db);
         }
@@ -248,10 +260,10 @@ void applyMigrations()
     }
 }
 
-// helper function to get all values by name as if it were a database enum type.
-T[] getDBEnumValues(T)() {
-    auto db = openDB();
-    DataSet!T ds;
-    import std.array;
-    return db.fetch(select(ds).orderBy(ds.name)).array;
+Migration addRepeatEventTags()
+{
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Event ADD COLUMN tag_id INTEGER DEFAULT NULL`);
+    return result;
 }
