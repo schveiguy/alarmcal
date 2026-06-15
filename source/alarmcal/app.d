@@ -526,27 +526,32 @@ void performEditEvent(Request request, Output output) {
     auto e = request.post.extract!Event();
     e.id = request.post.read("id").to!int;
     auto existing = db.fetchUsingKey!Event(e.id);
-    e.tag_id = existing.tag_id;
-    db.save(e);
 
-    if (request.post.read("apply_to", "this") == "subsequent") {
-        int rootId = e.tag_id.get;
+    if (!existing.tag_id.isNull && request.post.read("apply_to", "this") == "subsequent") {
+        int rootId = existing.tag_id.get;
         auto duration = e.end - e.start;
         DataSet!Event ds;
         auto subsequent = db.fetch(select(ds)
             .where(ds.tag_id, " = ", rootId.param, " AND ", ds.start, " > ", existing.start.param)).array;
-        foreach (ref ev; subsequent) {
-            ev.title = e.title;
-            ev.type = e.type;
-            ev.location_id = e.location_id;
-            ev.maxStudents = e.maxStudents;
-            ev.minStudents = e.minStudents;
-            ev.minAdults = e.minAdults;
-            ev.start = DateTime(ev.start.date, e.start.timeOfDay);
-            ev.end = ev.start + duration;
-            db.save(ev);
+        if (subsequent.length > 0) {
+            // break off from the original tag id (if not this event)
+            e.tag_id = nullable(e.id);
+            foreach (ref ev; subsequent) {
+                ev.tag_id = e.tag_id;
+                ev.title = e.title;
+                ev.type = e.type;
+                ev.location_id = e.location_id;
+                ev.maxStudents = e.maxStudents;
+                ev.minStudents = e.minStudents;
+                ev.minAdults = e.minAdults;
+                ev.start = DateTime(ev.start.date, e.start.timeOfDay);
+                ev.end = ev.start + duration;
+                db.save(ev);
+            }
         }
     }
+    // save the actual event.
+    db.save(e);
 
     output.redirect("/");
 }
