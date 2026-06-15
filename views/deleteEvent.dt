@@ -1,0 +1,59 @@
+extends layout
+block content
+  - import alarmcal.dietutils;
+  h1 Delete Event
+
+  section
+    h2 #{item.title}
+    p
+      strong Type:
+      |  #{item.type}
+    p
+      strong Location:
+      |  #{locationName}
+    p
+      strong Start:
+      |  #{item.start.date.datePrinter} #{item.start.timeOfDay.timePrinter}
+    p
+      strong End:
+      |  #{item.end.timeOfDay.timePrinter}
+    - if(item.minStudents > 0 || item.maxStudents > 0 || item.minAdults > 0)
+      p
+        - if(item.minStudents > 0)
+          | Min students: #{item.minStudents}&nbsp;
+        - if(item.maxStudents > 0)
+          | Max students: #{item.maxStudents}&nbsp;
+        - if(item.minAdults > 0)
+          | Min adults: #{item.minAdults}
+    h3 RSVPs
+    - if(rsvps.length == 0)
+      p No RSVPs.
+    - else
+      ul
+        - foreach(rsvp; rsvps)
+          - auto person = personMap[rsvp.person_id];
+          li
+            | #{person.name} (#{person.memberType})
+            - if(rsvp.attendanceRecorded)
+              |  (checked in)
+
+  p.warning Are you sure you want to delete this event?
+
+  form(method="POST", action="/performDeleteEvent")
+    input(type="hidden", name="id", value=(item.id))
+    - if(isSeries)
+      section
+        .form-group
+          label Delete:
+          label
+            input(type="radio", name="delete_scope", value="this", checked=true)
+            |  This event only
+          label
+            input(type="radio", name="delete_scope", value="subsequent")
+            - if(subsequentCount > 0)
+              |  This and all subsequent events (#{subsequentCount} additional event#{subsequentCount == 1 ? "" : "s"} will also be deleted)
+            - else
+              |  This and all subsequent events (no other subsequent events in this series)
+    .form-group
+      button(type="submit") Confirm Delete
+      a(href="/")  Cancel

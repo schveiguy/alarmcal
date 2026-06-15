@@ -557,6 +557,63 @@ void performEditEvent(Request request, Output output) {
 }
 
 @endpoint
+@getRoute!"/deleteEvent"
+void deleteEventForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can delete an event");
+    }
+    static struct params { int id; }
+    auto p = request.get.extract!params;
+    auto item = db.fetchUsingKey!Event(p.id);
+    auto locationName = db.fetchUsingKey!Location(item.location_id).name;
+    DataSet!PersonEvent pesds;
+    auto rsvps = db.fetch(select(pesds).where(pesds.event_id, " = ", item.id.param)).array;
+    auto personMap = getPersonMap();
+    bool isSeries = !item.tag_id.isNull;
+    long subsequentCount = 0;
+    if (isSeries) {
+        DataSet!Event evds;
+        subsequentCount = db.fetchOne(select(count(evds.id))
+            .where(evds.tag_id, " = ", item.tag_id.get.param, " AND ", evds.start, " > ", item.start.param));
+    }
+    output.renderDiet!("deleteEvent.dt", currentUser, item, locationName, rsvps, personMap, isSeries, subsequentCount);
+}
+
+@endpoint
+@postRoute!"/performDeleteEvent"
+void performDeleteEvent(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can delete an event");
+    }
+    import std.conv : to;
+    int id = request.post.read("id").to!int;
+    auto existing = db.fetchUsingKey!Event(id);
+
+    DataSet!PersonEvent pes;
+
+    void eraseEvent(Event ev) {
+        db.perform(removeFrom(pes.tableDef).where(pes.event_id, " = ", ev.id.param));
+        db.erase(ev);
+        infof("Deleted event '%s' (id:%s) starting %s, by %s", ev.title, ev.id, ev.start, currentUser.name);
+    }
+
+    if (request.post.read("delete_scope", "this") == "subsequent" && !existing.tag_id.isNull) {
+        int rootId = existing.tag_id.get;
+        DataSet!Event evds;
+        auto toDelete = db.fetch(select(evds)
+            .where(evds.tag_id, " = ", rootId.param, " AND ", evds.start, " >= ", existing.start.param)).array;
+        foreach (ev; toDelete)
+            eraseEvent(ev);
+    } else {
+        eraseEvent(existing);
+    }
+
+    output.redirect("/");
+}
+
+@endpoint
 @getRoute!"/rsvp"
 void rsvp(Request request, Output output) {
     static struct params {

@@ -109,3 +109,8 @@ table.item-table tbody tr:hover {
   display: inline-block;
   margin-right: 1em;
 }
+
+p.warning {
+  color: #c55;
+  font-weight: bold;
+}

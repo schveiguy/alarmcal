@@ -74,4 +74,6 @@ block content
                 a.em-button(class='#{imGoing ? "em-cancel-rsvp" : "em-rsvp"}', href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") #{imGoing ? "Cancel RSVP" : "RSVP"}
                 - if(currentUser.admin)
                   | &nbsp;
-                  a.em-button.em-edit(href="/editEvent?id=#{ev.event.id}") Edit Event
+                  a.em-button.em-edit(href="/editEvent?id=#{ev.event.id}") Edit
+                  | &nbsp;
+                  a.em-button.em-delete(href="/deleteEvent?id=#{ev.event.id}") Delete

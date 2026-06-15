@@ -50,7 +50,8 @@ document.addEventListener('DOMContentLoaded', function () {
       : '<a class="em-rsvp"        href="/rsvp?event_id=' + eid + '&attending=true">RSVP</a>';
 
     var adminHtml = isAdmin
-      ? '<a class="em-edit" href="/editEvent?id=' + eid + '">Edit Event</a>'
+      ? '<a class="em-edit"   href="/editEvent?id='   + eid + '">Edit</a>' +
+        '<a class="em-delete" href="/deleteEvent?id=' + eid + '">Delete</a>'
       : '';
 
     modal.innerHTML =
