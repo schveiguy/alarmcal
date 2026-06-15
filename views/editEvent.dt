@@ -1,0 +1,23 @@
+extends layout
+block content
+  include form
+  h1 Edit Event
+
+  form(method="POST", action="/performEditEvent")
+    input(type="hidden", name="id", value=(item.id))
+    section
+      - import alarmcal.db;
+      - createForm(item);
+    - if(isSeries)
+      section
+        h3 This is a repeating event
+        .form-group
+          label Apply changes to:
+          label
+            input(type="radio", name="apply_to", value="this", checked=true)
+            |  This event only
+          label
+            input(type="radio", name="apply_to", value="subsequent")
+            |  This and all subsequent events in the series
+    .form-group
+      button(type="submit") Submit

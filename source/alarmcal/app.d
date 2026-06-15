@@ -343,6 +343,10 @@ void performAddEvent(Request request, Output output) {
             e.title, e.id, e.type, e.location_id, e.start, e.end, e.minStudents, e.maxStudents, e.minAdults);
 
     if (doRepeat) {
+        // update the original event with the repeat tag id
+        e.tag_id = nullable(e.id);
+        db.save(e);
+
         auto duration = e.end - e.start;
         auto curDate = e.start.date + 1.days;
         auto repeatDays = repeat.days;
@@ -350,7 +354,6 @@ void performAddEvent(Request request, Output output) {
             if (repeatDays[curDate.dayOfWeek]) {
                 Event repeated = e;
                 repeated.id = 0;
-                repeated.tag_id = nullable(e.id);
                 repeated.start = DateTime(curDate, e.start.timeOfDay);
                 repeated.end = repeated.start + duration;
                 db.create(repeated);
@@ -496,6 +499,56 @@ void performEditLocation(Request request, Output output) {
     l.id = request.post.read("id").to!int;
     db.save(l);
     output.redirect("/locations");
+}
+
+@endpoint
+@getRoute!"/editEvent"
+void editEventForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit an event");
+    }
+    static struct params { int id; }
+    auto p = request.get.extract!params;
+    auto item = db.fetchUsingKey!Event(p.id);
+    bool isSeries = !item.tag_id.isNull;
+    output.renderDiet!("editEvent.dt", currentUser, item, isSeries);
+}
+
+@endpoint
+@postRoute!"/performEditEvent"
+void performEditEvent(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit an event");
+    }
+    import std.conv : to;
+    auto e = request.post.extract!Event();
+    e.id = request.post.read("id").to!int;
+    auto existing = db.fetchUsingKey!Event(e.id);
+    e.tag_id = existing.tag_id;
+    db.save(e);
+
+    if (request.post.read("apply_to", "this") == "subsequent") {
+        int rootId = e.tag_id.get;
+        auto duration = e.end - e.start;
+        DataSet!Event ds;
+        auto subsequent = db.fetch(select(ds)
+            .where(ds.tag_id, " = ", rootId.param, " AND ", ds.start, " > ", existing.start.param)).array;
+        foreach (ref ev; subsequent) {
+            ev.title = e.title;
+            ev.type = e.type;
+            ev.location_id = e.location_id;
+            ev.maxStudents = e.maxStudents;
+            ev.minStudents = e.minStudents;
+            ev.minAdults = e.minAdults;
+            ev.start = DateTime(ev.start.date, e.start.timeOfDay);
+            ev.end = ev.start + duration;
+            db.save(ev);
+        }
+    }
+
+    output.redirect("/");
 }
 
 @endpoint
