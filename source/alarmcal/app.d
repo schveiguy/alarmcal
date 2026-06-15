@@ -458,6 +458,7 @@ void performEditPerson(Request request, Output output) {
     if(p.password_hash == null)
         p.password_hash = db.fetchUsingKey!Person(p.id).password_hash;
     db.save(p);
+    infof("Updated person id:%s '%s' type=%s admin=%s by %s", p.id, p.name, p.memberType, p.admin, currentUser.name);
     output.redirect("/persons");
 }
 
@@ -498,6 +499,7 @@ void performEditLocation(Request request, Output output) {
     auto l = request.post.extract!Location();
     l.id = request.post.read("id").to!int;
     db.save(l);
+    infof("Updated location id:%s '%s' at '%s' by %s", l.id, l.name, l.address, currentUser.name);
     output.redirect("/locations");
 }
 
@@ -547,11 +549,13 @@ void performEditEvent(Request request, Output output) {
                 ev.start = DateTime(ev.start.date, e.start.timeOfDay);
                 ev.end = ev.start + duration;
                 db.save(ev);
+                infof("Updated subsequent event '%s' (id:%s) starting %s, by %s", ev.title, ev.id, ev.start, currentUser.name);
             }
         }
     }
     // save the actual event.
     db.save(e);
+    infof("Updated event '%s' (id:%s) starting %s, by %s", e.title, e.id, e.start, currentUser.name);
 
     output.redirect("/");
 }
@@ -626,9 +630,11 @@ void rsvp(Request request, Output output) {
     DataSet!PersonEvent ds;
     auto imGoing = db.fetchOne(select(count(ds.person_id)).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
     if(imGoing) {
-        if(!p.attending)
+        if(!p.attending) {
             // remove the rsvp
             db.perform(removeFrom(ds.tableDef).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
+            infof("Cancelled RSVP for event_id:%s by %s", p.event_id, currentUser.name);
+        }
     }
     else if(p.attending) {
         // add the rsvp
@@ -636,6 +642,7 @@ void rsvp(Request request, Output output) {
                     person_id: currentUser.id,
                     event_id: p.event_id,
                     ));
+        infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
     }
     output.redirect(p.style.length ? "/?style=" ~ p.style : "/");
 }
@@ -661,9 +668,11 @@ void checkIn(Request request, Output output) {
             return output.messageRedirect("Already checked in", "You have already checked in for today's event(s). No need to checkin again");
         }
         db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
+        infof("Checked in %s to all events today at location_id:%s", currentUser.name, p.location_id);
         return output.messageRedirect("Checked in", "Thanks for checking in for today's event(s)!");
     } else if(p.event_id != -1) {
         db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
+        infof("Checked in %s to event_id:%s", currentUser.name, p.event_id);
     } else {
         output.status = 400;
         output.write("You must supply either an event id or a location id to checkin");
