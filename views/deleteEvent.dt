@@ -45,15 +45,16 @@ block content
       section
         .form-group
           label Delete:
-          label
-            input(type="radio", name="delete_scope", value="this", checked=true)
-            |  This event only
-          label
-            input(type="radio", name="delete_scope", value="subsequent")
-            - if(subsequentCount > 0)
-              |  This and all subsequent events (#{subsequentCount} additional event#{subsequentCount == 1 ? "" : "s"} will also be deleted)
-            - else
-              |  This and all subsequent events (no other subsequent events in this series)
+          .radio-group
+            label
+              input(type="radio", name="delete_scope", value="this", checked=true)
+              | This event only
+            label
+              input(type="radio", name="delete_scope", value="subsequent")
+              - if(subsequentCount > 0)
+                | This and all subsequent events (#{subsequentCount} additional event#{subsequentCount == 1 ? "" : "s"} will also be deleted)
+              - else
+                | This and all subsequent events (no other subsequent events in this series)
     .form-group
       button(type="submit") Confirm Delete
       a(href="/")  Cancel
