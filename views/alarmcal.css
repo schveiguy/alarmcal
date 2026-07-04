@@ -34,6 +34,7 @@ td.day {
   width: 100px;
   height: 50px;
   border: 1px solid black;
+  padding: 4px 6px;
 }
 td.unused_day {
   width: 100px;
@@ -127,3 +128,15 @@ p.warning {
   color: #c55;
   font-weight: bold;
 }
+
+p[class^="event-type-"] {
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 3px 0;
+}
+
+p.event-type-shop                 { background-color: #cce8ff; }
+p.event-type-outreach             { background-color: #d4edda; }
+p.event-type-competition          { background-color: #f8d7da; }
+p.event-type-offseasonCompetition { background-color: #fde8c8; }
+p.event-type-recreation           { background-color: #e8d5f5; }

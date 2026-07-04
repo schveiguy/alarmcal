@@ -60,3 +60,21 @@
 .em-cancel-rsvp { background: #c55; color: #fff; }
 .em-edit        { background: #57b; color: #fff; }
 .em-delete      { background: #c55; color: #fff; }
+
+.event-btn {
+  background: #7ec89a;
+  border: 1px solid #3a7;
+  color: #fff;
+  cursor: pointer;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  font-size: .6rem;
+  line-height: 1rem;
+  text-align: center;
+  padding: 0;
+  vertical-align: middle;
+  display: inline-block;
+  margin-left: 4px;
+}
+.event-btn:hover { background: #4a9; }
