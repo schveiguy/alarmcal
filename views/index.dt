@@ -21,9 +21,18 @@ block content
   h1 4H-Alarm Team 2079 Activity Calendar
   - auto today = cast(Date)Clock.currTime();
   - foreach(mon; model.cal)
-    h3 #{mon[0][$-1].get.date.month} #{mon[0][$-1].get.date.year}
     - if(model.params.style == DisplayStyle.calendar)
       table.cal_table
+        tr
+          th.month_title(colspan="7") #{monthNames[mon[0][$-1].get.date.month]} #{mon[0][$-1].get.date.year}
+        tr
+          th.day_title Sun
+          th.day_title Mon
+          th.day_title Tue
+          th.day_title Wed
+          th.day_title Thu
+          th.day_title Fri
+          th.day_title Sat
         - foreach(wr; mon)
           tr
             - foreach(d; wr)
@@ -45,14 +54,15 @@ block content
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
                       button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &#x2139;
     - else
+      h2 #{monthNames[mon[0][$-1].get.date.month]} #{mon[0][$-1].get.date.year}
       - foreach(wr; mon)
         - foreach(d; wr)
           - if(d.isNull || d.get.events.length == 0) continue;
           div.event_list_day
             h4
-              | #{d.get.date.dayOfWeek} #{d.get.date.day}
+              | #{dayNames[d.get.date.dayOfWeek]} #{monthNames[d.get.date.month]} #{d.get.date.day}
               - if(d.get.date == today)
-                | (TODAY)
+                |  (TODAY)
             - foreach(ev; d.get.events)
               - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
               - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";

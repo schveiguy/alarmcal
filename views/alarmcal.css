@@ -28,7 +28,7 @@ td.day_num {
   width: 100px;
   text-align: center;
   border: 1px solid grey;
-  background: lightgrey;
+  background-color: lightgrey;
 }
 td.day {
   width: 100px;
@@ -44,8 +44,11 @@ td.unused_day_num {
   width: 100px;
 }
 table.cal_table {
+  margin-top: 20px;
   border-spacing: 0;
   border-collapse: collapse;
+  border: 1px black solid;
+  background-color: #f0f0f0;
 }
 table.cal_table tr td {
   padding-top: 5px;
@@ -53,8 +56,16 @@ table.cal_table tr td {
 table.cal_table td.day.today {
   background-color: lightyellow;
 }
+table.cal_table td.day {
+  background-color: white;
+}
 table.cal_table td.day_num.today {
   background-color: yellow;
+}
+
+table.cal_table th.month_title {
+    background-color: #57b;
+    color: white;
 }
 .admin_tool {
   display: inline-block;

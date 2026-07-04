@@ -2,6 +2,31 @@ module alarmcal.dietutils;
 import std.datetime;
 import std.json : JSONValue;
 
+string[] monthNames = [
+    Month.jan: "January",
+    Month.feb: "February",
+    Month.mar: "March",
+    Month.apr: "April",
+    Month.may: "May",
+    Month.jun: "June",
+    Month.jul: "July",
+    Month.aug: "August",
+    Month.sep: "September",
+    Month.oct: "October",
+    Month.nov: "November",
+    Month.dec: "December"
+];
+
+string[] dayNames = [
+    DayOfWeek.sun: "Sunday",
+    DayOfWeek.mon: "Monday",
+    DayOfWeek.tue: "Tuesday",
+    DayOfWeek.wed: "Wednesday",
+    DayOfWeek.thu: "Thursday",
+    DayOfWeek.fri: "Friday",
+    DayOfWeek.sat: "Saturday",
+];
+
 auto datePrinter(Date d)
 {
     static struct DP {
