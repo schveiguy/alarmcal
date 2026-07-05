@@ -61,7 +61,7 @@ struct Event
     @noform @refersTo!Event("originalEvent") Nullable!int tag_id;
     string title;
     DateTime start;
-    DateTime end;
+    @timeOnly DateTime end;
     @refersTo!Location("location") @dbenum!Location int location_id;
     EventType type;
     int maxStudents; // limit to how many students can attend, 0 = no limit.

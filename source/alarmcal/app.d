@@ -124,8 +124,12 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target) 
                 }
             }}
             else static if(is(FT == DateTime)) {
-                target.tupleof[idx] = DateTime(Date.fromISOExtString(data.read(formname ~ "_d")),
-                        parseTime(data.read(formname ~ "_t")));
+                static if(hasUDA!(target.tupleof[idx], form.timeOnly)) {
+                    target.tupleof[idx] = DateTime(Date.init, parseTime(data.read(formname)));
+                } else {
+                    target.tupleof[idx] = DateTime(Date.fromISOExtString(data.read(formname ~ "_d")),
+                            parseTime(data.read(formname ~ "_t")));
+                }
             }
             else static if(is(FT == Date)) {
                 target.tupleof[idx] = Date.fromISOExtString(data.read(formname));
@@ -147,6 +151,14 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target) 
         }
     }}
 }
+
+Event extractEvent(string prefix="")(Request.SafeAccess!string data) {
+    auto event = extract!(Event, prefix)(data);
+    // fix end event date to match start date
+    event.end.date = event.start.date;
+    return event;
+}
+
 
 struct EventInfo
 {
@@ -313,7 +325,11 @@ void performAddEvent(Request request, Output output) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a new event");
     }
-    auto e = request.post.extract!Event();
+    auto e = request.post.extractEvent();
+    if (e.start > e.end) {
+        output.status = 400;
+        return output.messageRedirect("Error", "End time cannot be prior to start time");
+    }
     static struct Repeat {
         bool sun, mon, tue, wed, thu, fri, sat;
         Date end;
@@ -525,7 +541,11 @@ void performEditEvent(Request request, Output output) {
         return output.messageRedirect("Forbidden", "Only administrators can edit an event");
     }
     import std.conv : to;
-    auto e = request.post.extract!Event();
+    auto e = request.post.extractEvent();
+    if (e.start > e.end) {
+        output.status = 400;
+        return output.messageRedirect("Error", "End time cannot be prior to start time");
+    }
     e.id = request.post.read("id").to!int;
     auto existing = db.fetchUsingKey!Event(e.id);
 

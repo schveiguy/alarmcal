@@ -10,6 +10,9 @@ enum password;
 // field is optional on extraction
 enum optional;
 
+// for DateTime types, only edit the time
+enum timeOnly;
+
 struct dbenum(T) {
     alias Type = T;
 }

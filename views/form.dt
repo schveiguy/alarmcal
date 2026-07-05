@@ -27,6 +27,9 @@
     input(type="date", value=(defaultVal.date.datePrinter), name="#{prefix}#{name}_d")
     input(type="time", value=(defaultVal.timeOfDay), name="#{prefix}#{name}_t")
 
+- void formFieldTimeOfDay(string name, string prefix, TimeOfDay defaultVal)
+  input(type="time", value=(defaultVal), name="#{prefix}#{name}")
+
 - void formFieldBool(string name, string prefix, bool defaultVal, string labelText)
   label
     input(type="checkbox", checked=defaultVal, name="#{prefix}#{name}", value="true")
@@ -43,6 +46,8 @@
       - formFieldString(name, prefix, defaultVal);
     - else static if(is(T == DateTime))
       - formFieldDateTime(name, prefix, defaultVal);
+    - else static if(is(T == TimeOfDay))
+      - formFieldTimeOfDay(name, prefix, defaultVal);
     - else
       - static assert(false, "Unhandled field type: " ~ T.stringof);
 
@@ -60,5 +65,7 @@
       - else static if(is(typeof(T.tupleof[idx]) == bool))
         .form-group
           - formFieldBool(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));
+      - else static if(is(typeof(T.tupleof[idx]) == DateTime) && hasUDA!(T.tupleof[idx], timeOnly))
+        - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx].timeOfDay, getFieldLabel!(T.tupleof[idx]));
       - else
         - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));
