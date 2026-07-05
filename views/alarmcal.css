@@ -155,3 +155,7 @@ p.event-type-outreach             { background-color: #d4edda; }
 p.event-type-competition          { background-color: #f8d7da; }
 p.event-type-offseasonCompetition { background-color: #fde8c8; }
 p.event-type-recreation           { background-color: #e8d5f5; }
+
+span.attending_check {
+    color: green;
+}
