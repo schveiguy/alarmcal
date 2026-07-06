@@ -693,6 +693,7 @@ void checkIn(Request request, Output output) {
     } else if(p.event_id != -1) {
         db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
         infof("Checked in %s to event_id:%s", currentUser.name, p.event_id);
+        return output.redirect("/");
     } else {
         output.status = 400;
         output.write("You must supply either an event id or a location id to checkin");

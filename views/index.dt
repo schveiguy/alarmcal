@@ -6,7 +6,7 @@ block content
   - import alarmcal.dietutils;
   - import alarmcal.db;
   - import std.traits;
-  - import std.algorithm : map, any, count, joiner, canFind;
+  - import std.algorithm : map, any, count, joiner, canFind, filter;
   - import std.conv : to;
   - import std.format : format;
   - alias DisplayStyle = typeof(model.params.style);
@@ -20,6 +20,19 @@ block content
         option(value=(style), selected=(model.params.style == style)) #{style}
   h1 4H-Alarm Team 2079 Activity Calendar
   - auto today = cast(Date)Clock.currTime();
+  - auto myTodayEvents = model.cal.joiner.joiner.filter!(d => !d.isNull && d.get.date == today).map!(d => d.get.events.filter!(ev => ev.attendees.any!(att => att.person_id == currentUser.id))).joiner;
+  - if (!myTodayEvents.empty)
+    div#today-checkin
+      h2 Check In for Today
+      - foreach(ev; myTodayEvents)
+        - auto myAtt = ev.attendees.filter!(att => att.person_id == currentUser.id);
+        - bool checkedIn = !myAtt.empty && myAtt.front.attendanceRecorded;
+        div.today-event
+          | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
+          - if (checkedIn)
+            span.em-button.em-checked-in &#x2714; Checked in
+          - else
+            a.em-button.em-checkin(href="/checkIn?event_id=#{ev.event.id}") Check In
   - if(model.params.style == DisplayStyle.calendar)
     - foreach(mon; model.cal)
       table.cal_table

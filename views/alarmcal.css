@@ -253,7 +253,7 @@ span.low_count {
   flex-wrap: wrap;
 }
 
-.em-actions a, a.em-button {
+.em-actions a, a.em-button, span.em-button {
   padding: .4rem .9rem;
   border-radius: 4px;
   text-decoration: none;
@@ -284,3 +284,24 @@ span.low_count {
   margin-left: 4px;
 }
 .event-btn:hover { background: #4a9; }
+
+#today-checkin {
+    background-color: #f0f8f0;
+    border: 1px solid #3a7;
+    border-radius: 6px;
+    padding: 0.75em 1em;
+    margin-bottom: 1em;
+}
+
+#today-checkin h2 {
+    margin: 0 0 0.5em;
+    font-size: 1.1rem;
+    color: #2a6;
+}
+
+.today-event {
+    margin: 0.3em 0;
+}
+
+.em-checkin     { background: #3a7; color: #fff; }
+.em-checked-in  { background: #888; color: #fff; cursor: default; }
