@@ -82,4 +82,15 @@ document.addEventListener('DOMContentLoaded', function () {
     var btn = e.target.closest && e.target.closest('.event-btn');
     if (btn) { e.preventDefault(); openModal(btn); }
   });
+
+  /* ---------- Show past events ---------- */
+  var showPastBtn = document.getElementById('show-past');
+  if (showPastBtn) {
+    showPastBtn.addEventListener('click', function () {
+      document.querySelectorAll('.hidden_data').forEach(function (el) {
+        el.classList.add('revealed');
+      });
+      showPastBtn.style.display = 'none';
+    });
+  }
 });

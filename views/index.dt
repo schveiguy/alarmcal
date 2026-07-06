@@ -58,7 +58,7 @@ block content
   - else
     - auto hasHiddenData = model.cal.joiner.joiner.canFind!(d => !d.isNull && d.get.events.length > 0 && d.get.date < today);
     - if (hasHiddenData)
-      p TODO: put control to expand hidden sections here
+      button#show-past &blacktriangleright; Show past events
     - foreach(mon; model.cal)
       - auto hideMonthTitle = mon[0][$-1].get.date.endOfMonth < today;
       h2(class='#{hideMonthTitle ? "hidden_data" : ""}') #{monthNames[mon[0][$-1].get.date.month]} #{mon[0][$-1].get.date.year}
