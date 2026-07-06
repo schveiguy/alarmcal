@@ -159,3 +159,10 @@ p.event-type-recreation           { background-color: #e8d5f5; }
 span.attending_check {
     color: green;
 }
+
+span.low_count {
+    padding: 4px;
+    background-color: #c55;
+    color: white;
+    border-radius: 4px;
+}
