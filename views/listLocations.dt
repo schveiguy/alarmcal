@@ -1,6 +1,4 @@
 extends layout
-block extraHead
-  link(rel="stylesheet", href="/assets/css/eventpopup.css")
 block content
   include tableView
   h1 Locations

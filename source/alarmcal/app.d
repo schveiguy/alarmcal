@@ -717,13 +717,6 @@ void eventPopupJs(Request request, Output output) {
     output.serveStaticFile("views/eventpopup.js", "text/javascript; charset=utf-8");
 }
 
-@endpoint
-@getRoute!"/assets/css/eventpopup.css"
-void eventPopupCss(Request request, Output output) {
-    output.serveStaticFile("views/eventpopup.css", "text/css; charset=utf-8");
-}
-
-
 /* The default configuration is used if you do not implement this function.*/
 
 @onServerInit ServerinoConfig configure()

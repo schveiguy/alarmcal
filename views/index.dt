@@ -1,6 +1,5 @@
 extends layout
 block extraHead
-  link(rel="stylesheet", href="/assets/css/eventpopup.css")
   script(src="/assets/js/eventpopup.js")
 block content
   - import std.datetime;
