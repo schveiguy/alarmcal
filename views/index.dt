@@ -52,7 +52,7 @@ block content
                     - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, att.attendanceRecorded));
                     p(class="event-type-#{ev.event.type}")
                       - if (imGoing)
-                        span.attending_check &check; 
+                        span.attending_check(title="You are attending") &check; 
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
                       button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &#x2139;
     - else
@@ -61,7 +61,7 @@ block content
         - foreach(d; wr)
           - if(d.isNull || d.get.events.length == 0) continue;
           div.event_list_day
-            h4
+            h3
               | #{dayNames[d.get.date.dayOfWeek]} #{monthNames[d.get.date.month]} #{d.get.date.day}
               - if(d.get.date == today)
                 |  (TODAY)
@@ -79,40 +79,52 @@ block content
               - auto mentorsSatisfied = mentorCount >= 1;
               p(class="event-type-#{ev.event.type}")
                 - if (imGoing)
-                  span.attending_check &check; 
+                  span.attending_check(title="You are attending") &check; 
                 | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                p Location: #{locName}
-                p
-                  | Student count: #{memberTypes.count(MemberType.student)} (min 
-                  span(class='#{studentsSatisfied ? "" : "low_count"}') #{ev.event.minStudents}
-                  - if (ev.event.maxStudents > 0)
-                    | , max #{ev.event.maxStudents}
-                  | )
-                p
-                  | Adult count:
-                  span(class='#{mentorsSatisfied ? "" : "low_count"}') #{memberTypes.count(MemberType.mentor)}
-                  |  mentors, #{memberTypes.count(MemberType.parent)} parents (min 
-                  span(class='#{adultsSatisfied ? "" : "low_count"}') #{ev.event.minAdults}
-                  | )
-
-              - foreach(att; ev.attendees)
-                - imGoing = imGoing || att.person_id == currentUser.id;
-                - auto p = model.people[att.person_id];
-                p.attendee
-                  | #{p.name} - #{p.memberType}
-                  - if(att.attendanceRecorded)
-                    | (checked in)
-                  - else if(d.get.date == today)
-                    | (not seen yet)
-                  - else if(d.get.date < today)
-                    | (absent)
+              p.em-meta
+                strong Type: 
+                | #{ev.event.type}
+              p.em-meta
+                strong Location: 
+                | #{locName}
+              p.em-meta
+                strong Student count: 
+                | #{memberTypes.count(MemberType.student)} (min 
+                span(class='#{studentsSatisfied ? "" : "low_count"}') #{ev.event.minStudents}
+                - if (ev.event.maxStudents > 0)
+                  | , max #{ev.event.maxStudents}
+                | )
+              p.em-meta
+                strong Adult count: 
+                span(class='#{mentorsSatisfied ? "" : "low_count"}') #{memberTypes.count(MemberType.mentor)}
+                |  mentors, #{memberTypes.count(MemberType.parent)} parents (min 
+                span(class='#{adultsSatisfied ? "" : "low_count"}') #{ev.event.minAdults}
+                | )
+              - if (ev.attendees.length == 0)
+                p.em-meta
+                  em No Attendees yet.
+              - else
+                div.em-attendees
+                  h4 Attendees (#{ev.attendees.length})
+                  ul
+                    - foreach(att; ev.attendees)
+                      - auto p = model.people[att.person_id];
+                      li
+                        | #{p.name} - #{p.memberType}
+                        - if(att.attendanceRecorded)
+                          em  (checked in)
+                        - else if(d.get.date == today)
+                          em  (not seen yet)
+                        - else if(d.get.date < today)
+                          em  (absent)
               div
-                - if (imGoing)
-                  a.em-button.em-cancel-rsvp(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") Cancel RSVP
-                - else if (studentsMaxed)
-                  a.em-button.em-disabled(href="#") Full
-                - else
-                  a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") RSVP
+                - if (d.get.date >= today)
+                  - if (imGoing)
+                    a.em-button.em-cancel-rsvp(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") Cancel RSVP
+                  - else if (studentsMaxed)
+                    a.em-button.em-disabled(href="#") Full
+                  - else
+                    a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") RSVP
                 - if(currentUser.admin)
                   | &nbsp;
                   a.em-button.em-edit(href="/editEvent?id=#{ev.event.id}") Edit
