@@ -167,6 +167,10 @@ span.low_count {
     border-radius: 4px;
 }
 
+.hidden_data {
+    display: none;
+}
+
 #event-modal-overlay {
   display: none;
   position: fixed;

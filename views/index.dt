@@ -6,7 +6,7 @@ block content
   - import alarmcal.dietutils;
   - import alarmcal.db;
   - import std.traits;
-  - import std.algorithm : map, any, count;
+  - import std.algorithm : map, any, count, joiner, canFind;
   - import std.conv : to;
   - import std.format : format;
   - alias DisplayStyle = typeof(model.params.style);
@@ -20,8 +20,8 @@ block content
         option(value=(style), selected=(model.params.style == style)) #{style}
   h1 4H-Alarm Team 2079 Activity Calendar
   - auto today = cast(Date)Clock.currTime();
-  - foreach(mon; model.cal)
-    - if(model.params.style == DisplayStyle.calendar)
+  - if(model.params.style == DisplayStyle.calendar)
+    - foreach(mon; model.cal)
       table.cal_table
         tr
           th.month_title(colspan="7") #{monthNames[mon[0][$-1].get.date.month]} #{mon[0][$-1].get.date.year}
@@ -55,12 +55,17 @@ block content
                         span.attending_check(title="You are attending") &check; 
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
                       button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson)) &#x2139;
-    - else
-      h2 #{monthNames[mon[0][$-1].get.date.month]} #{mon[0][$-1].get.date.year}
+  - else
+    - auto hasHiddenData = model.cal.joiner.joiner.canFind!(d => !d.isNull && d.get.events.length > 0 && d.get.date < today);
+    - if (hasHiddenData)
+      p TODO: put control to expand hidden sections here
+    - foreach(mon; model.cal)
+      - auto hideMonthTitle = mon[0][$-1].get.date.endOfMonth < today;
+      h2(class='#{hideMonthTitle ? "hidden_data" : ""}') #{monthNames[mon[0][$-1].get.date.month]} #{mon[0][$-1].get.date.year}
       - foreach(wr; mon)
         - foreach(d; wr)
           - if(d.isNull || d.get.events.length == 0) continue;
-          div.event_list_day
+          div.event_list_day(class='#{d.get.date < today ? "hidden_data" : ""}')
             h3
               | #{dayNames[d.get.date.dayOfWeek]} #{monthNames[d.get.date.month]} #{d.get.date.day}
               - if(d.get.date == today)
