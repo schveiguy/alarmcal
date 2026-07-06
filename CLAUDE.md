@@ -60,6 +60,8 @@ Add a user via the CLI (admins can also add users through the `/addPerson` route
 
 **DateTime handling** — `DateTime` fields in forms are split into two inputs (`_d` for date, `_t` for time) by both `form.dt` and `extract!T()`. The diet templates import `alarmcal.dietutils` for rendering helpers.
 
+**Diet template whitespace** — Trailing spaces at the end of lines in `.dt` files are intentional and meaningful: diet-ng uses them to inject a space between adjacent inline nodes (e.g., `span.attending_check ... &check; ` followed by `| text`). Never strip trailing spaces from diet templates.
+
 ### Data Model
 
 - `Person` — team member with `MemberType` (student/parent/mentor), email/password for login, `admin` flag
