@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="em-close" aria-label="Close">&times;</button>' +
       '<h2 class="em-title">' + esc(d.title) + '</h2>' +
       '<p class="em-meta"><strong>Type:</strong> '     + esc(d.type)     + '</p>' +
-      (d.location ? '<p class="em-meta"><strong>Location:</strong> ' + esc(d.location) + '</p>' : '') +
+      (d.location ? '<p class="em-meta"><strong>Location:</strong> ' + (d.locationUrl ? '<a href="' + esc(d.locationUrl) + '" target="_blank" rel="noopener">' + esc(d.location) + '</a>' : esc(d.location)) + '</p>' : '') +
       '<p class="em-meta"><strong>Start:</strong> '   + esc(d.start)    + '</p>' +
       '<p class="em-meta"><strong>End:</strong> '     + esc(d.end)      + '</p>' +
       countsHtml(attendeeList, minStudents, maxStudents, minAdults) +
