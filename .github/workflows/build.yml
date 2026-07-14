@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ master ]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -28,3 +31,13 @@ jobs:
 
       - name: Run tests
         run: dub test --compiler=ldc2
+
+      - name: Publish latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          make_latest: true
+          body: "Automated build from ${{ github.sha }}"
+          files: alarmcal
