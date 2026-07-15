@@ -32,6 +32,9 @@ jobs:
       - name: Run tests
         run: dub test --compiler=ldc2
 
+      - name: Package artifact
+        run: tar czf alarmcal.tar.gz alarmcal views/*.css views/*.js
+
       - name: Publish latest release
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
@@ -40,4 +43,4 @@ jobs:
           name: Latest build
           make_latest: true
           body: "Automated build from ${{ github.sha }}"
-          files: alarmcal
+          files: alarmcal.tar.gz
