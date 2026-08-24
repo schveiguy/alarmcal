@@ -2,6 +2,7 @@ module alarmcal.app;
 
 import alarmcal.db;
 import alarmcal.router;
+import alarmcal.session;
 import form = alarmcal.formudas;
 
 import std.array;
@@ -225,31 +226,90 @@ Location[int] getLocationMap() {
     return result;
 }
 
-// TODO: use sessions instead of basic auth?
+bool isHttpsRequest(Request request)
+{
+    return request.header.read("x-forwarded-proto", "") == "https";
+}
+
+// Upper bound on how long the browser is allowed to retain the cookie. This is
+// intentionally much longer than `sessionDuration`: the actual sliding 7-day
+// inactivity timeout is enforced server-side by `validateSession`, which
+// extends `Session.expires` in the database on every valid request. Because
+// serverino treats any `output.setCookie` call as "this endpoint produced the
+// response" (it marks Output dirty, which stops any further routing for the
+// request - see worker.d's callUntilIsDirty), `checkSession` below must NOT
+// reissue the cookie on every request, or it would swallow every authenticated
+// page load before the real route handler ever runs. Setting a long, fixed
+// client-side Max-Age once at login sidesteps that entirely: the cookie is
+// just a storage cap, not the security boundary.
+enum cookieMaxAge = 400.days;
+
+void setSessionCookie(Request request, Output output, string token)
+{
+    output.setCookie(Cookie("session", token)
+            .path("/")
+            .httpOnly()
+            .sameSite(Cookie.SameSite.Lax)
+            .maxAge(cookieMaxAge)
+            .secure(isHttpsRequest(request)));
+}
+
 @priority(10)
 @endpoint
-void checkAuth(Request request, Output output){
-
-    // validate the user is logged in.
-    auto username = request.user;
-    auto password = request.password;
+void checkSession(Request request, Output output){
     db = openDB();
+    auto token = request.cookie.read("session", "");
+    currentUser = validateSession(db, token);
+    if(currentUser.id != -1)
+        return;
+
+    import std.algorithm : startsWith;
+    if(request.path == "/login" || request.path == "/performLogin" || request.path.startsWith("/assets/"))
+        return;
+
+    output.redirect("/login");
+}
+
+@endpoint
+@getRoute!"/login"
+void loginForm(Request request, Output output) {
+    if(currentUser.id != -1)
+        return output.redirect("/");
+    bool error = false;
+    output.renderDiet!("login.dt", error);
+}
+
+@endpoint
+@postRoute!"/performLogin"
+void performLogin(Request request, Output output) {
+    if(currentUser.id != -1)
+        return output.redirect("/");
+
+    auto email = request.post.read("email", "");
+    auto password = request.post.read("password", "");
     DataSet!Person ds;
-    currentUser = db.fetchOne(select(ds).where(ds.email, " = ", request.user.param), Person.init);
+    auto candidate = db.fetchOne(select(ds).where(ds.email, " = ", email.param), Person.init);
     import botan.passhash.bcrypt;
-    if(currentUser.password_hash == "" || !checkBcrypt(request.password, currentUser.password_hash)) {
+    if(candidate.id == -1 || candidate.password_hash == "" || !checkBcrypt(password, candidate.password_hash)) {
+        warningf("Failed login attempt for email %s", email);
         output.status = 401;
-        output.addHeader("www-authenticate",`Basic realm="4H alarm calendar"`);
-        if(currentUser.id == -1)
-        {
-            // invalid user
-            if(request.user != "")
-                warningf("Invalid user: %s", request.user);
-        }
-        else
-            // invalid password
-            warningf("Failed login attempt for user %s", request.user);
+        bool error = true;
+        return output.renderDiet!("login.dt", error);
     }
+
+    auto session = startSession(db, candidate.id);
+    setSessionCookie(request, output, session.token);
+    infof("User %s logged in", candidate.email);
+    output.redirect("/");
+}
+
+@endpoint
+@getRoute!"/logout"
+void logout(Request request, Output output) {
+    if(currentUser.id != -1)
+        endSession(db, request.cookie.read("session", ""));
+    output.setCookie(Cookie("session", "").invalidate());
+    output.redirect("/login");
 }
 
 struct IndexViewModel {
@@ -471,9 +531,14 @@ void performEditPerson(Request request, Output output) {
     import std.conv : to;
     auto p = request.post.extract!Person();
     p.id = request.post.read("id").to!int;
-    if(p.password_hash == null)
+    bool passwordChanged = p.password_hash != null;
+    if(!passwordChanged)
         p.password_hash = db.fetchUsingKey!Person(p.id).password_hash;
     db.save(p);
+    if(passwordChanged) {
+        endAllSessions(db, p.id);
+        infof("Password changed for person id:%s '%s' by %s, all sessions invalidated", p.id, p.name, currentUser.name);
+    }
     infof("Updated person id:%s '%s' type=%s admin=%s by %s", p.id, p.name, p.memberType, p.admin, currentUser.name);
     output.redirect("/persons");
 }

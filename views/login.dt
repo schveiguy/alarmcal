@@ -1,0 +1,17 @@
+doctype html
+head
+  title 4H Alarm Calendar - Login
+  link(rel="stylesheet", href="/assets/css/alarmcal.css")
+body
+  h1 4H Alarm Calendar
+  - if(error)
+    p(style="color: red;") Invalid email or password.
+  form(method="POST", action="/performLogin")
+    .form-group
+      label(for="email") Email
+      input(type="email", name="email", id="email", required)
+    .form-group
+      label(for="password") Password
+      input(type="password", name="password", id="password", required)
+    .form-group
+      button(type="submit") Log in
