@@ -175,7 +175,7 @@ struct CalendarDay
 @requestScope
 {
     Person currentUser;
-    Database db;
+    AutoClosingDatabase db;
 }
 
 Nullable!CalendarDay[][] getMonth(Date date, Event[][Date] events)
@@ -239,7 +239,7 @@ void checkAuth(Request request, Output output){
     import botan.passhash.bcrypt;
     if(currentUser.password_hash == "" || !checkBcrypt(request.password, currentUser.password_hash)) {
         output.status = 401;
-		output.addHeader("www-authenticate",`Basic realm="4H alarm calendar"`);
+        output.addHeader("www-authenticate",`Basic realm="4H alarm calendar"`);
         if(currentUser.id == -1)
         {
             // invalid user
@@ -722,13 +722,14 @@ void eventPopupJs(Request request, Output output) {
 
 @onServerInit ServerinoConfig configure()
 {
-	return ServerinoConfig
-		.create()
-		.addListener("127.0.0.1", 8080);
+    return ServerinoConfig
+        .create()
+        .addListener("127.0.0.1", 8080)
+        .setWorkers(1);
 
-		// You can set many other options here. For example:
-		// .setMaxRequestTime(1.seconds)
-		// .setMaxRequestSize(1024*1024); // 1 MB
-		// .setWorkers(10); // To set a fixed number of workers.
-		// Many other options are available: https://trikko.github.io/serverino/serverino/config/ServerinoConfig.html
+        // You can set many other options here. For example:
+        // .setMaxRequestTime(1.seconds)
+        // .setMaxRequestSize(1024*1024); // 1 MB
+        // .setWorkers(10); // To set a fixed number of workers.
+        // Many other options are available: https://trikko.github.io/serverino/serverino/config/ServerinoConfig.html
 }

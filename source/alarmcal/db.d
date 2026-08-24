@@ -22,6 +22,30 @@ import alarmcal.formudas;
 
 enum databaseName = "caldata.sqlite";
 
+struct AutoClosingDatabase {
+    Database db;
+    bool initialized;
+
+    void opAssign(Database db) {
+        destroy(this);
+        this.db = db;
+        initialized = true;
+    }
+
+    ~this() {
+        if(initialized)
+        {
+            db.close();
+            initialized = false;
+        }
+    }
+
+    alias db this;
+
+    // no copying.
+    @disable this(this);
+}
+
 enum MemberType {
     student,
     parent,
