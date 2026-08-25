@@ -52,27 +52,27 @@ NewSession startSession(Database db, int personId)
 
 // validates a raw session token, sliding its expiration forward on success.
 // returns Person.init (id == -1) if the token is missing, unknown, or expired.
-Person validateSession(Database db, string rawToken)
+Session validateSession(Database db, string rawToken)
 {
     if (rawToken.length == 0)
-        return Person.init;
+        return Session.init;
 
     auto hash = hashToken(rawToken);
     DataSet!Session ds;
     auto session = db.fetchOne(select(ds).where(ds.tokenHash, " = ", hash.param), Session.init);
     if (session.id == -1)
-        return Person.init;
+        return session;
 
     auto now = cast(DateTime)Clock.currTime;
     if (session.expires <= now)
     {
         db.erase(session);
-        return Person.init;
+        return Session.init;
     }
 
     session.expires = now + sessionDuration;
     db.save(session);
-    return db.fetchUsingKey!Person(session.person_id);
+    return session;
 }
 
 // deletes the session identified by the given raw token (logout).
@@ -86,8 +86,11 @@ void endSession(Database db, string rawToken)
 }
 
 // deletes all sessions belonging to the given person (e.g. on password change).
+// the current session is excepted to avoid having to log in again.
 void endAllSessions(Database db, int personId)
 {
+    import alarmcal.app : currentSession;
     DataSet!Session ds;
-    db.perform(removeFrom(ds.tableDef).where(ds.person_id, " = ", personId.param));
+    auto cmd = removeFrom(ds.tableDef).where(ds.person_id, " = ", personId.param).where(ds.id, " <> ", currentSession.id.param);
+    db.perform(cmd);
 }

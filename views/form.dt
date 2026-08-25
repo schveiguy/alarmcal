@@ -3,6 +3,7 @@
 - import sqlbuilder.uda;
 - import std.traits;
 - import std.datetime;
+- import std.algorithm : canFind;
 - void formFieldNum(T)(string name, string prefix, T defaultVal)
   input(type="number", value=defaultVal, name="#{prefix}#{name}")
 
@@ -51,21 +52,22 @@
     - else
       - static assert(false, "Unhandled field type: " ~ T.stringof);
 
-- void createForm(T, string prefix="")(T defaultVal = T.init)
+- void createForm(T, string prefix="")(T defaultVal = T.init, string[] exceptThese = [])
   - static foreach(idx; 0 .. T.tupleof.length)
     - static if(!hasUDA!(T.tupleof[idx], autoIncrement) && !hasUDA!(T.tupleof[idx], noform))
-      - static if(isIntegral!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], dbenum))
-        .form-group
-          label #{getFieldLabel!(T.tupleof[idx])}
-          - formFieldDBEnum(__traits(identifier, T.tupleof[idx]), prefix, getDBEnumValues!(getUDAs!(T.tupleof[idx], dbenum)[0].Type), defaultVal.tupleof[idx]);
-      - else static if(isSomeString!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], password))
-        .form-group
-          label #{getFieldLabel!(T.tupleof[idx])}
-          - formFieldPassword(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
-      - else static if(is(typeof(T.tupleof[idx]) == bool))
-        .form-group
-          - formFieldBool(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));
-      - else static if(is(typeof(T.tupleof[idx]) == DateTime) && hasUDA!(T.tupleof[idx], timeOnly))
-        - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx].timeOfDay, getFieldLabel!(T.tupleof[idx]));
-      - else
-        - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));
+      - if(!exceptThese.canFind(__traits(identifier, T.tupleof[idx])))
+        - static if(isIntegral!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], dbenum))
+          .form-group
+            label #{getFieldLabel!(T.tupleof[idx])}
+            - formFieldDBEnum(__traits(identifier, T.tupleof[idx]), prefix, getDBEnumValues!(getUDAs!(T.tupleof[idx], dbenum)[0].Type), defaultVal.tupleof[idx]);
+        - else static if(isSomeString!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], password))
+          .form-group
+            label #{getFieldLabel!(T.tupleof[idx])}
+            - formFieldPassword(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx]);
+        - else static if(is(typeof(T.tupleof[idx]) == bool))
+          .form-group
+            - formFieldBool(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));
+        - else static if(is(typeof(T.tupleof[idx]) == DateTime) && hasUDA!(T.tupleof[idx], timeOnly))
+          - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx].timeOfDay, getFieldLabel!(T.tupleof[idx]));
+        - else
+          - formField(__traits(identifier, T.tupleof[idx]), prefix, defaultVal.tupleof[idx], getFieldLabel!(T.tupleof[idx]));

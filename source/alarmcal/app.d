@@ -96,61 +96,63 @@ string getPasswordHash(string input) {
     return generateBcrypt(input, rng, 10);
 }
 
-T extract(T, string prefix="")(Request.SafeAccess!string data) {
+T extract(T, string prefix="")(Request.SafeAccess!string data, string[] exceptThese = []) {
     T result;
-    data.extract(result);
+    data.extract(result, exceptThese);
     return result;
 }
 
-void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target) {
+void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, string[] exceptThese = []) {
     import std.traits;
     import std.conv;
     import sqlbuilder.uda;
     import std.stdio;
     import alarmcal.dietutils;
     import std.string : strip;
+    import std.algorithm : canFind;
 
-    static foreach(idx; 0 .. T.tupleof.length) {{
+    static foreach(idx; 0 .. T.tupleof.length) {
         static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)){
-            alias FT = typeof(target.tupleof[idx]);
-            enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
-            static if(hasUDA!(target.tupleof[idx], form.password)) {{
-                auto pw = data.read(formname).to!string;
-                if (pw.strip.length == 0)
-                    // no password provided
-                    target.tupleof[idx] = null;
+            if(!exceptThese.canFind(__traits(identifier, T.tupleof[idx]))) {
+                alias FT = typeof(target.tupleof[idx]);
+                enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
+                static if(hasUDA!(target.tupleof[idx], form.password)) {
+                    auto pw = data.read(formname).to!string;
+                    if (pw.strip.length > 0) {
+                        // password was provided, hash it.
+                        auto hash = getPasswordHash(pw);
+                        target.tupleof[idx] = hash.to!FT;
+                    }
+                    // else, leave the existing field.
+                }
+                else static if(is(FT == DateTime)) {
+                    static if(hasUDA!(target.tupleof[idx], form.timeOnly)) {
+                        target.tupleof[idx] = DateTime(Date.init, parseTime(data.read(formname)));
+                    } else {
+                        target.tupleof[idx] = DateTime(Date.fromISOExtString(data.read(formname ~ "_d")),
+                                parseTime(data.read(formname ~ "_t")));
+                    }
+                }
+                else static if(is(FT == Date)) {
+                    target.tupleof[idx] = Date.fromISOExtString(data.read(formname));
+                }
+                else static if(is(FT == bool)) {
+                    // booleans are a checkbox, and only if they are checked is the value transmitted.
+                    target.tupleof[idx] = data.read(formname, "false").to!bool;
+                }
                 else {
-                    auto hash = getPasswordHash(pw);
-                    target.tupleof[idx] = hash.to!FT;
+                    auto val = data.read(formname);
+                    if(val.length == 0)
+                    {
+                        static if (!(hasUDA!(target.tupleof[idx], form.optional)))
+                            throw new Exception("Need required field " ~ formname);
+                    }
+                    else
+                        target.tupleof[idx] = val.to!FT;
                 }
-            }}
-            else static if(is(FT == DateTime)) {
-                static if(hasUDA!(target.tupleof[idx], form.timeOnly)) {
-                    target.tupleof[idx] = DateTime(Date.init, parseTime(data.read(formname)));
-                } else {
-                    target.tupleof[idx] = DateTime(Date.fromISOExtString(data.read(formname ~ "_d")),
-                            parseTime(data.read(formname ~ "_t")));
-                }
-            }
-            else static if(is(FT == Date)) {
-                target.tupleof[idx] = Date.fromISOExtString(data.read(formname));
-            }
-            else static if(is(FT == bool)) {
-                // booleans are a checkbox, and only if they are checked is the value transmitted.
-                target.tupleof[idx] = data.read(formname, "false").to!bool;
-            }
-            else {
-                auto val = data.read(formname);
-                if(val.length == 0)
-                {
-                    static if (!(hasUDA!(target.tupleof[idx], form.optional)))
-                        throw new Exception("Need required field " ~ formname);
-                }
-                else
-                    target.tupleof[idx] = val.to!FT;
             }
         }
-    }}
+    }
 }
 
 Event extractEvent(string prefix="")(Request.SafeAccess!string data) {
@@ -176,6 +178,7 @@ struct CalendarDay
 @requestScope
 {
     Person currentUser;
+    Session currentSession;
     AutoClosingDatabase db;
 }
 
@@ -259,9 +262,12 @@ void setSessionCookie(Request request, Output output, string token)
 void checkSession(Request request, Output output){
     db = openDB();
     auto token = request.cookie.read("session", "");
-    currentUser = validateSession(db, token);
-    if(currentUser.id != -1)
+    currentSession = validateSession(db, token);
+    if(currentSession.id != -1)
+    {
+        currentUser = db.fetchUsingKey!Person(currentSession.person_id);
         return;
+    }
 
     import std.algorithm : startsWith;
     if(request.path == "/login" || request.path == "/performLogin" || request.path.startsWith("/assets/"))
@@ -529,18 +535,39 @@ void performEditPerson(Request request, Output output) {
         return output.messageRedirect("Forbidden", "Only administrators can edit a person");
     }
     import std.conv : to;
-    auto p = request.post.extract!Person();
-    p.id = request.post.read("id").to!int;
-    bool passwordChanged = p.password_hash != null;
-    if(!passwordChanged)
-        p.password_hash = db.fetchUsingKey!Person(p.id).password_hash;
+    auto p = db.fetchUsingKey!Person(request.post.read("id").to!int);
+    auto origPW = p.password_hash;
+    request.post.extract(p);
+    auto pwChanged = origPW != p.password_hash;
     db.save(p);
-    if(passwordChanged) {
+    if(pwChanged) {
         endAllSessions(db, p.id);
         infof("Password changed for person id:%s '%s' by %s, all sessions invalidated", p.id, p.name, currentUser.name);
     }
     infof("Updated person id:%s '%s' type=%s admin=%s by %s", p.id, p.name, p.memberType, p.admin, currentUser.name);
     output.redirect("/persons");
+}
+
+@endpoint
+@getRoute!"/editProfile"
+void editProfileForm(Request request, Output output) {
+    output.renderDiet!("editProfile.dt", currentUser);
+}
+
+@endpoint
+@postRoute!"/performEditProfile"
+void performEditProfile(Request request, Output output) {
+    import std.conv : to;
+    auto p = currentUser;
+    request.post.extract(p, exceptThese: ["admin", "memberType"]);
+    auto pwChanged = currentUser.password_hash != p.password_hash;
+    db.save(p);
+    if(pwChanged) {
+        endAllSessions(db, p.id);
+        infof("Person id:%d '%s' changed their password, all other sessions invalidated", p.id, p.name);
+    }
+    infof("Person id:%s '%s' changed their profile, email=%s", p.id, p.name, p.email);
+    output.redirect("/");
 }
 
 @endpoint
