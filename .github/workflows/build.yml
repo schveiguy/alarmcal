@@ -29,8 +29,8 @@ jobs:
       - name: Build
         run: dub build --compiler=ldc2
 
-      - name: Run tests
-        run: dub test --compiler=ldc2
+      #- name: Run tests (note: no tests yet)
+      #  run: dub -b unittest --compiler=ldc2
 
       - name: Package artifact
         run: tar czf alarmcal.tar.gz alarmcal views/*.css views/*.js
