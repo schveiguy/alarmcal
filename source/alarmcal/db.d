@@ -113,6 +113,15 @@ struct MigrationRecord
     string md5hash; // hash of the migration, all applied migrations MUST MATCH
 }
 
+struct Session
+{
+    @primaryKey @autoIncrement long id = -1;
+    @mustReferTo!Person("person") int person_id;
+    @unique string tokenHash; // SHA-256 hex digest of the raw session token; raw token is never stored
+    DateTime expires;
+    DateTime created;
+}
+
 // set to true if newly created sqlite database, all migrations are
 // assumed to be applied.
 bool assumeAllMigrations;
@@ -135,6 +144,7 @@ Database openDB()
         db.execute(createTableSql!(Location, true));
         db.execute(createTableSql!(Event, true));
         db.execute(createTableSql!(PersonEvent, true));
+        db.execute(createTableSql!(Session, true));
         db.execute(createTableSql!(MigrationRecord, true));
         assumeAllMigrations = true;
     }
@@ -211,7 +221,8 @@ struct Migration
 void applyMigrations()
 {
     Migration[] migrations = [
-        addRepeatEventTags()
+        addRepeatEventTags(),
+        addSessionTable()
     ];
 
     auto db = openDB();
@@ -289,5 +300,28 @@ Migration addRepeatEventTags()
     Migration result;
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE Event ADD COLUMN tag_id INTEGER DEFAULT NULL`);
+    return result;
+}
+
+Migration addSessionTable()
+{
+    // NOTE: this struct intentionally duplicates the live Session struct's
+    // definition as of when this migration was written. Do NOT change it to
+    // reference the module-level Session directly: future changes to Session
+    // must not alter what this migration executes. The name matches on
+    // purpose so the generated table name is "Session"; this local struct
+    // shadows the module-level one within this function.
+    static struct Session
+    {
+        @primaryKey @autoIncrement long id = -1;
+        @mustReferTo!Person("person") int person_id;
+        @unique string tokenHash;
+        DateTime expires;
+        DateTime created;
+    }
+
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add((Database db) { db.execute(createTableSql!(Session, true));});
     return result;
 }
