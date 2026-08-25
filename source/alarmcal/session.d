@@ -26,7 +26,7 @@ string generateSessionToken()
     scope AutoSeededRNG rng = new AutoSeededRNG;
     ubyte[32] buf;
     rng.randomize(buf.ptr, buf.length);
-    return toHexString!(LetterCase.lower)(buf[]).idup;
+    return toHexString!(LetterCase.lower)(buf).idup;
 }
 
 string hashToken(string token)
