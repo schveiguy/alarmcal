@@ -1,0 +1,10 @@
+extends layout
+block content
+  include form
+  h1 Edit Profile
+
+  form(method="POST", action="/performEditProfile")
+    section
+      - createForm(currentUser, exceptThese: ["admin", "memberType"]);
+    .form-group
+      button(type="submit") Submit

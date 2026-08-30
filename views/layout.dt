@@ -14,5 +14,6 @@ body(data-admin=(currentUser.admin ? "true" : "false"))
       a.admin_tool(href="/locations") Locations
       a.admin_tool(href="/addLocation") Add Location
     a.admin_tool(href="/logout") Logout
+    a.admin_tool(href="/editProfile") Edit Profile
   block content
 
