@@ -26,13 +26,16 @@ ref EmailConfig config() {
     return appconfig.email;
 }
 
-void sendEventEmail(Event event, string message) {
-    // open the database 
-    auto db = openDB();
-    // find all people who are attending
+void sendEventEmail(Event event, string message, bool isAttending) {
+    import alarmcal.app : db;
+    // find all the target users
     DataSet!PersonEvent peds;
     Person[] recipients = db.fetch(select(peds.person).where(peds.event_id, " = ", event.id.param)).array;
 
+    sendEventEmail(event, message, isAttending, recipients);
+}
+
+void sendEventEmail(Event event, string message, bool isAttending, Person[] recipients...) {
     foreach(r; recipients) {
         auto email = new Email();
         email.setFrom("event@alarmcal.info", "Alarm Events")
@@ -46,11 +49,10 @@ End:   $(event.end)
 
 You have signed up for this event. You can manage your participation in the event here: https://alarmcal.info
 
-Check in when you are the event by using the QR code at the location, or 
-$("https://alarmcal.info/checkIn?event_id=")$(event.id)
-
+$(isAttending ? "Check in when you are the event by using the QR code at the location, or\n" ~ 
+i"this link: https://alarmcal.info/checkIn?event_id=$(event.id)\n".text : "")
 $(emailDisclaimer)`.text)
-            .setHtmlBody(renderDiet!("mailEventReminder.dt", message, event, emailDisclaimer))
+            .setHtmlBody(renderDiet!("mailEventReminder.dt", message, event, emailDisclaimer, isAttending))
             .addTo(r.email, r.name)
             .send(config.smtpUrl, config.username, config.password);
     }

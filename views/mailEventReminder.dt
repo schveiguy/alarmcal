@@ -9,11 +9,12 @@ html
     p Start: #{event.start}
     p End: #{event.end}
 
-    p You have signed up for this event. You can manage your participation in the event here: https://alarmcal.info
+    p You can manage your participation in the event here: https://alarmcal.info
 
-    p
-      | Check in when you are the event by using the QR code at the location, or 
-      a(href="https://alarmcal.info/checkIn?event_id=#{event.id}") this link
-      | .
+    - if(isAttending)
+      p
+        | Check in when you are the event by using the QR code at the location, or 
+        a(href="https://alarmcal.info/checkIn?event_id=#{event.id}") this link
+        | .
 
     p #{emailDisclaimer}

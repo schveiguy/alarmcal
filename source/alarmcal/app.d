@@ -9,6 +9,7 @@ import form = alarmcal.formudas;
 
 import std.array;
 import std.datetime;
+import std.conv : text;
 import core.time;
 import std.typecons;
 import std.logger;
@@ -651,7 +652,11 @@ void performEditEvent(Request request, Output output) {
         return output.messageRedirect("Error", "End time cannot be prior to start time");
     }
     e.id = request.post.read("id").to!int;
-    auto existing = db.fetchUsingKey!Event(e.id);
+    auto existing = db.fetchUsingKey!Event(Event.init, e.id);
+    if(existing.id == -1) {
+        output.status = 400;
+        return output.messageRedirect("Invalid event", i"Invalid event id specified: $(e.id)".text);
+    }
 
     if (!existing.tag_id.isNull && request.post.read("apply_to", "this") == "subsequent") {
         int rootId = existing.tag_id.get;
@@ -673,12 +678,14 @@ void performEditEvent(Request request, Output output) {
                 ev.start = DateTime(ev.start.date, e.start.timeOfDay);
                 ev.end = ev.start + duration;
                 db.save(ev);
+                sendEventEmail(ev, "Event has been modified.", isAttending: true);
                 infof("Updated subsequent event '%s' (id:%s) starting %s, by %s", ev.title, ev.id, ev.start, currentUser.name);
             }
         }
     }
     // save the actual event.
     db.save(e);
+    sendEventEmail(e, "Event has been modified.", isAttending: true);
     infof("Updated event '%s' (id:%s) starting %s, by %s", e.title, e.id, e.start, currentUser.name);
 
     output.redirect("/");
@@ -717,11 +724,17 @@ void performDeleteEvent(Request request, Output output) {
     }
     import std.conv : to;
     int id = request.post.read("id").to!int;
-    auto existing = db.fetchUsingKey!Event(id);
+    auto existing = db.fetchUsingKey!Event(Event.init, id);
+    if(existing.id == -1) {
+        output.status = 400;
+        return output.messageRedirect("Invalid event", i"Invalid event id specified: $(id)".text);
+    }
 
     DataSet!PersonEvent pes;
 
     void eraseEvent(Event ev) {
+        // send out any notifications of the event being deleted
+        sendEventEmail(ev, "The event has been removed from the calendar", isAttending: false);
         db.perform(removeFrom(pes.tableDef).where(pes.event_id, " = ", ev.id.param));
         db.erase(ev);
         infof("Deleted event '%s' (id:%s) starting %s, by %s", ev.title, ev.id, ev.start, currentUser.name);
@@ -750,6 +763,11 @@ void rsvp(Request request, Output output) {
         @(form.optional) string style;
     }
     auto p = request.get.extract!params;
+    auto ev = db.fetchUsingKey!Event(Event.init, p.event_id);
+    if(ev.id == -1) {
+        output.status = 400;
+        return output.messageRedirect("Invalid event", i"Invalid event id provided: $(p.event_id)".text);
+    }
     // check if the rsvp already exists
     DataSet!PersonEvent ds;
     auto imGoing = db.fetchOne(select(count(ds.person_id)).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
@@ -758,6 +776,7 @@ void rsvp(Request request, Output output) {
             // remove the rsvp
             db.perform(removeFrom(ds.tableDef).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
             infof("Cancelled RSVP for event_id:%s by %s", p.event_id, currentUser.name);
+            sendEventEmail(ev, "You have cancelled your reservation.", isAttending: false, currentUser);
         }
     }
     else if(p.attending) {
@@ -767,6 +786,7 @@ void rsvp(Request request, Output output) {
                     event_id: p.event_id,
                     ));
         infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
+        sendEventEmail(ev, "You have signed up for this event.", isAttending: true, currentUser);
     }
     output.redirect(p.style.length ? "/?style=" ~ p.style : "/");
 }
