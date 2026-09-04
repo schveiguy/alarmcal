@@ -16,3 +16,4 @@ alarmcal-test-*
 *.obj
 *.lst
 .claude
+alarmcal_config.json5

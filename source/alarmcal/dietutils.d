@@ -1,6 +1,10 @@
 module alarmcal.dietutils;
 import std.datetime;
 import std.json : JSONValue;
+import std.array : appender;
+import diet.html;
+
+import serverino : Output;
 
 string[] monthNames = [
     Month.jan: "January",
@@ -79,3 +83,17 @@ TimeOfDay parseTime(string input)
     auto s = items.front;
     return TimeOfDay(h, m, s);
 }
+
+string renderDiet(Args...)()
+{
+    auto text = appender!string;
+    text.compileHTMLDietFile!(Args);
+    return text[];
+}
+
+void renderDiet(Args...)(ref Output output)
+{
+    output.addHeader("content-type", "text/html");
+    output.write(renderDiet!Args());
+}
+

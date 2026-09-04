@@ -1,0 +1,19 @@
+html
+  body
+    - import alarmcal.formudas;
+    - import std.conv : to;
+    h1 Event #{event.title} Notification
+    p #{message}
+
+    p Event: #{event.title} #{fieldNameToCapitals(event.type.to!string)}
+    p Start: #{event.start}
+    p End: #{event.end}
+
+    p You have signed up for this event. You can manage your participation in the event here: https://alarmcal.info
+
+    p
+      | Check in when you are the event by using the QR code at the location, or 
+      a(href="https://alarmcal.info/checkIn?event_id=#{event.id}") this link
+      | .
+
+    p #{emailDisclaimer}

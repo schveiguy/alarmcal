@@ -5,9 +5,11 @@
 	"dependencies": {
 		"d2sqlite3": "~>1.0.0",
 		"diet-ng": "~>1.8.4",
+		"jsoniopipe": "~>0.2.7",
+		"postino": "~>0.1.4",
 		"serverino": "~>0.7.21",
 		"sqlbuilder": "~>0.2.3",
-        "botan": "~>1.13.8"
+		"botan": "~>1.13.8"
 	},
 	"license": "BSL-1.0",
 	"name": "alarmcal",

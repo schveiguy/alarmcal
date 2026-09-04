@@ -3,6 +3,8 @@ module alarmcal.app;
 import alarmcal.db;
 import alarmcal.router;
 import alarmcal.session;
+import alarmcal.mail;
+import alarmcal.dietutils;
 import form = alarmcal.formudas;
 
 import std.array;
@@ -12,12 +14,12 @@ import std.typecons;
 import std.logger;
 import std.exception;
 
-import diet.html;
-
 import sqlbuilder.dialect.sqlite;
 import sqlbuilder.dataset;
 
 import serverino;
+
+enum ConfigFileName = "alarmcal_config.json5";
 
 mixin ServerinoLoop;
 
@@ -40,11 +42,30 @@ int cliAddUser(string[] args) {
 }
 
 
+struct Config {
+    EmailConfig email;
+}
+
+Config config;
+
 int main(string[] args)
 {
     import std.base64 : Base64;
     import std.process : environment;
     import std.string : split;
+
+    {
+        // TODO: use actual io
+        import std.file;
+        import iopipe.json.serialize;
+        import iopipe.json.parser;
+
+        if(exists(ConfigFileName))
+        {
+            auto jt = readText(ConfigFileName).jsonTokenizer!(ParseConfig(JSON5: true));
+            deserialize(jt, config);
+        }
+    }
 
     // always apply migrations
     applyMigrations();
@@ -65,14 +86,6 @@ int main(string[] args)
     if (environment.get("SERVERINO_ARGS") !is null)
         args = (cast(string)Base64.decode(environment.get("SERVERINO_ARGS"))).split("\0");
     return mainServerinoLoop!OnMainThread(args);
-}
-
-void renderDiet(Args...)(ref Output output)
-{
-    auto text = appender!string;
-    text.compileHTMLDietFile!(Args);
-    output.addHeader("content-type", "text/html");
-    output.write(text[]);
 }
 
 void redirect(ref Output output, string location)
@@ -107,7 +120,6 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, 
     import std.conv;
     import sqlbuilder.uda;
     import std.stdio;
-    import alarmcal.dietutils;
     import std.string : strip;
     import std.algorithm : canFind;
 

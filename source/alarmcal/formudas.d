@@ -22,7 +22,7 @@ struct label {
     string text;
 }
 
-private string fieldNameToCapitals(string s) pure {
+string fieldNameToCapitals(string s) pure {
     if (s.length == 0) return s;
     import std.ascii : toUpper, isUpper;
     string result = [toUpper(s[0])];
