@@ -1,5 +1,7 @@
 module alarmcal.db;
 
+import alarmcal.app : getTime;
+
 import sqlbuilder.uda;
 import sqlbuilder.dataset;
 import sqlbuilder.dialect.sqlite;
@@ -261,7 +263,7 @@ void applyMigrations()
         return;
     // there are some unapplied migrations. First, copy the database file as a backup.
     db.close();
-    auto appliedDate = cast(DateTime)Clock.currTime;
+    auto appliedDate = cast(DateTime)getTime();
     string backupDBName = format("migration_backup_%s_%s", appliedDate.toISOString, databaseName);
     std.file.copy(databaseName, backupDBName);
     db = Database(databaseName);

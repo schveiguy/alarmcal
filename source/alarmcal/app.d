@@ -5,6 +5,7 @@ import alarmcal.router;
 import alarmcal.session;
 import alarmcal.mail;
 import alarmcal.dietutils;
+import alarmcal.notifications;
 import form = alarmcal.formudas;
 
 import std.array;
@@ -14,15 +15,22 @@ import core.time;
 import std.typecons;
 import std.logger;
 import std.exception;
+import std.concurrency;
 
 import sqlbuilder.dialect.sqlite;
 import sqlbuilder.dataset;
 
 import serverino;
 
+import iopipe.json.serialize : optional;
+
 enum ConfigFileName = "alarmcal_config.json5";
 
 mixin ServerinoLoop;
+
+SysTime getTime() {
+    return Clock.currTime(PosixTimeZone.getTimeZone(cast()config.timeZone));
+}
 
 int cliAddUser(string[] args) {
     auto db = openDB();
@@ -45,9 +53,11 @@ int cliAddUser(string[] args) {
 
 struct Config {
     EmailConfig email;
+    @optional NotificationConfig notifications;
+    @optional string timeZone = "US/Eastern";
 }
 
-Config config;
+shared Config config;
 
 int main(string[] args)
 {
@@ -64,12 +74,15 @@ int main(string[] args)
         if(exists(ConfigFileName))
         {
             auto jt = readText(ConfigFileName).jsonTokenizer!(ParseConfig(JSON5: true));
-            deserialize(jt, config);
+            deserialize(jt, *cast(Config*)&config);
         }
     }
 
-    // always apply migrations
-    applyMigrations();
+    // always apply migrations, but only from the main process
+    if(!ServerinoProcess.isWorker)
+        applyMigrations();
+
+    infof("Loaded time zone: %s", cast()config.timeZone);
 
     // intercept the "cli" subcommand
     if (args.length > 1 && args[1] == "cli")
@@ -82,6 +95,12 @@ int main(string[] args)
                 throw new Exception("Unknown cli command: " ~ args[2]);
         }
         return 0;
+    }
+
+    // start up the notification thread
+    notificationTid = spawn(&notificationThread, );
+    scope(exit) {
+        notificationTid.send(Shutdown());
     }
 
     if (environment.get("SERVERINO_ARGS") !is null)
@@ -283,7 +302,7 @@ void checkSession(Request request, Output output){
     }
 
     import std.algorithm : startsWith;
-    if(request.path == "/login" || request.path == "/performLogin" || request.path.startsWith("/assets/"))
+    if(request.path == "/login" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/"))
         return;
 
     output.redirect("/login");
@@ -359,7 +378,7 @@ void index(Request request, Output output)
     request.get.extract(model.params);
 
     // figure out the days we need to pay attention to, up to one month before the current month
-    Date minDate = cast(Date)Clock.currTime;
+    Date minDate = cast(Date)getTime();
     minDate.day = 1;
     minDate.add!"months"(-1);
     DataSet!Event ds;
@@ -802,7 +821,7 @@ void checkIn(Request request, Output output) {
     auto p = request.get.extract!params;
     if(p.location_id != -1) {
         // The person is checking in to all events today at this location
-        auto today = cast(Date)Clock.currTime;
+        auto today = cast(Date)getTime();
         auto eventInfo = db.fetchOne(select(count(ds.id), exprCol!(Nullable!long)("SUM(", ds.attendanceRecorded, ")")).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
         if(eventInfo[0] == 0) {
             import std.format;
@@ -840,6 +859,19 @@ void alarmcalCss(Request request, Output output) {
 @getRoute!"/assets/js/eventpopup.js"
 void eventPopupJs(Request request, Output output) {
     output.serveStaticFile("views/eventpopup.js", "text/javascript; charset=utf-8");
+}
+
+@endpoint
+@getRoute!"/poke"
+void processPoke(Request request, Output output) {
+    if(request.header.read("x-alarmcal-poke-secret", "") != (cast()&config).notifications.alarmcalSecret) {
+        output.status = 403;
+        return output.write("Unauthorized!");
+    }
+    output.status = 200;
+    output.write("Poked\n");
+    // poke any notifications
+    handlePoke();
 }
 
 /* The default configuration is used if you do not implement this function.*/

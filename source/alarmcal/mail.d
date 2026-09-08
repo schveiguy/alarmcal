@@ -2,9 +2,9 @@ module alarmcal.mail;
 import alarmcal.db;
 import alarmcal.dietutils;
 import alarmcal.formudas : fieldNameToCapitals;
-import std.conv : to;
 
 import std.conv;
+import std.concurrency;
 import std.array;
 
 import sqlbuilder.dataset;
@@ -21,9 +21,9 @@ struct EmailConfig {
     string password;
 }
 
-ref EmailConfig config() {
+private ref const(EmailConfig) config() {
     import alarmcal.app : appconfig = config;
-    return appconfig.email;
+    return *cast(const(EmailConfig)*)&appconfig.email;
 }
 
 void sendEventEmail(Event event, string message, bool isAttending) {
@@ -53,7 +53,11 @@ $(isAttending ? "Check in when you are the event by using the QR code at the loc
 i"this link: https://alarmcal.info/checkIn?event_id=$(event.id)\n".text : "")
 $(emailDisclaimer)`.text)
             .setHtmlBody(renderDiet!("mailEventReminder.dt", message, event, emailDisclaimer, isAttending))
-            .addTo(r.email, r.name)
-            .send(config.smtpUrl, config.username, config.password);
+            .addTo(r.email, r.name);
+        sendEmail(email);
     }
+}
+
+void sendEmail(Email email) {
+    email.send(config.smtpUrl, config.username, config.password);
 }

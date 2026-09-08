@@ -8,7 +8,7 @@
 		"jsoniopipe": "~>0.2.7",
 		"postino": "~>0.1.4",
 		"serverino": "~>0.7.21",
-		"sqlbuilder": "~>0.2.3",
+		"sqlbuilder": "~>0.3.0",
 		"botan": "~>1.13.8"
 	},
 	"license": "BSL-1.0",

@@ -1,6 +1,7 @@
 module alarmcal.session;
 
 import alarmcal.db;
+import alarmcal.app : getTime;
 
 import sqlbuilder.dialect.sqlite;
 import sqlbuilder.dataset;
@@ -44,7 +45,7 @@ NewSession startSession(Database db, int personId)
     Session s;
     s.person_id = personId;
     s.tokenHash = hashToken(token);
-    s.created = cast(DateTime)Clock.currTime;
+    s.created = cast(DateTime)getTime();
     s.expires = s.created + sessionDuration;
     db.create(s);
     return NewSession(token, s.expires);
@@ -63,7 +64,7 @@ Session validateSession(Database db, string rawToken)
     if (session.id == -1)
         return session;
 
-    auto now = cast(DateTime)Clock.currTime;
+    auto now = cast(DateTime)getTime();
     if (session.expires <= now)
     {
         db.erase(session);
