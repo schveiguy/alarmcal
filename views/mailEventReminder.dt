@@ -2,19 +2,21 @@ html
   body
     - import alarmcal.formudas;
     - import std.conv : to;
-    h1 Event #{event.title} Notification
-    p #{message}
+    h1 #{message}
 
-    p Event: #{event.title} #{fieldNameToCapitals(event.type.to!string)}
-    p Start: #{event.start}
-    p End: #{event.end}
+    p
+      | #{fieldNameToCapitals(event.type.to!string)} Event: #{event.title}
+      br
+      | Start: #{event.start}
+      br
+      | End: #{event.end}
 
     p You can manage your participation in the event here: https://alarmcal.info
 
     - if(isAttending)
       p
         | Check in when you are the event by using the QR code at the location, or 
-        a(href="https://alarmcal.info/checkIn?event_id=#{event.id}") this link
+        a(href="https://alarmcal.info/checkIn?askToConfirm=true&event_id=#{event.id}") this link
         | .
 
     p #{emailDisclaimer}

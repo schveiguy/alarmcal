@@ -88,7 +88,7 @@ struct Event
     string title;
     DateTime start;
     @timeOnly DateTime end;
-    @refersTo!Location("location") @dbenum!Location int location_id;
+    @mustReferTo!Location("location") @dbenum!Location int location_id;
     EventType type;
     int maxStudents; // limit to how many students can attend, 0 = no limit.
     int minStudents; // minimum students required to hold the event.

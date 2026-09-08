@@ -2,6 +2,7 @@ module alarmcal.mail;
 import alarmcal.db;
 import alarmcal.dietutils;
 import alarmcal.formudas : fieldNameToCapitals;
+import alarmcal.notifications : dispatchEmail;
 
 import std.conv;
 import std.concurrency;
@@ -43,7 +44,7 @@ void sendEventEmail(Event event, string message, bool isAttending, Person[] reci
             .setPlainTextBody(
 i`$(message)
 
-Event: $(event.title) ($(fieldNameToCapitals(event.type.to!string)))
+$(fieldNameToCapitals(event.type.to!string)) Event: $(event.title)
 Start: $(event.start)
 End:   $(event.end)
 
@@ -54,7 +55,7 @@ i"this link: https://alarmcal.info/checkIn?event_id=$(event.id)\n".text : "")
 $(emailDisclaimer)`.text)
             .setHtmlBody(renderDiet!("mailEventReminder.dt", message, event, emailDisclaimer, isAttending))
             .addTo(r.email, r.name);
-        sendEmail(email);
+        dispatchEmail(email);
     }
 }
 

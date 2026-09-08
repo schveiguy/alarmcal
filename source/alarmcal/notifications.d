@@ -61,11 +61,10 @@ void notificationThread() {
     }
 }
 
-void sendEmail(Email email) {
+void dispatchEmail(Email email) {
     if(notificationTid is Tid.init) {
-        import alarmcal.mail;
         // no notification thread stored, send it right now.
-        alarmcal.mail.sendEmail(email);
+        sendEmail(email);
     }
     else {
         // ask the notification thread to send it.
@@ -74,8 +73,9 @@ void sendEmail(Email email) {
 }
 
 private void handle(SendEmail sem) {
-    import alarmcal.mail;
-    alarmcal.mail.sendEmail(sem.email);
+    import std.stdio;
+    writeln("sending an email");
+    sendEmail(sem.email);
 }
 
 private void poke() {

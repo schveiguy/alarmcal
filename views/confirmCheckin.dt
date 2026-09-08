@@ -1,0 +1,10 @@
+extends layout
+block content
+  h1 Check in for events at #{location.name}
+  - foreach(ev; events)
+    p #{ev[0].title}#{ev[1] ? " (already checked in)" : ""}
+  p
+    - if(events.length == 1)
+      a.em-button.em-checkin(href="/checkIn?event_id=#{events[0][0].id}") Check In
+    - else
+      a.em-button.em-checkin(href="/checkIn?location_id=#{location.id}") Check In

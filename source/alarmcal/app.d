@@ -816,13 +816,15 @@ void checkIn(Request request, Output output) {
     static struct params {
         @(form.optional) int location_id = -1;
         @(form.optional) int event_id = -1;
+        @(form.optional) bool askToConfirm = false;
     }
     DataSet!PersonEvent ds;
     auto p = request.get.extract!params;
     if(p.location_id != -1) {
         // The person is checking in to all events today at this location
         auto today = cast(Date)getTime();
-        auto eventInfo = db.fetchOne(select(count(ds.id), exprCol!(Nullable!long)("SUM(", ds.attendanceRecorded, ")")).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
+        auto bq = select().where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.location_id) = $(p.location_id) AND date($(ds.event.start)) = $(today)");
+        auto eventInfo = db.fetchOne(bq.select(count(ds.id), exprCol!(Nullable!long)("SUM(", ds.attendanceRecorded, ")")));
         if(eventInfo[0] == 0) {
             import std.format;
             return output.messageRedirect("Invalid checkin", format("No events at location %s, please RSVP for an event here before attempting to check in.", db.fetchUsingKey!Location(p.location_id).name));
@@ -830,10 +832,29 @@ void checkIn(Request request, Output output) {
         else if(eventInfo[1] == eventInfo[0]) {
             return output.messageRedirect("Already checked in", "You have already checked in for today's event(s). No need to checkin again");
         }
+        if(p.askToConfirm) {
+            // preview all the events that should be confirmed
+            auto events = db.fetch(bq.select(ds.event, ds.attendanceRecorded)).array;
+            auto location = db.fetchUsingKey!Location(p.location_id);
+            return output.renderDiet!("confirmCheckin.dt", events, location, currentUser);
+        }
         db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
         infof("Checked in %s to all events today at location_id:%s", currentUser.name, p.location_id);
         return output.messageRedirect("Checked in", "Thanks for checking in for today's event(s)!");
     } else if(p.event_id != -1) {
+        auto events = db.fetch(select(ds.event, ds.attendanceRecorded, ds.event.location).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.id) = $(p.event_id)")).array;
+        if(events.length == 0) {
+            import std.format;
+            return output.messageRedirect("Invalid checkin", format("You have not signed up for event %s, please RSVP before attempting to check in.", db.fetchUsingKey!Event(p.event_id).title));
+        }
+        if(events[0][1]) {
+            // already checked in.
+            return output.messageRedirect("Already checked in", "You have already checked in for this event. No need to checkin again");
+        }
+        if(p.askToConfirm) {
+            auto location = events[0][2];
+            return output.renderDiet!("confirmCheckin.dt", events, location, currentUser);
+        }
         db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
         infof("Checked in %s to event_id:%s", currentUser.name, p.event_id);
         return output.redirect("/");
