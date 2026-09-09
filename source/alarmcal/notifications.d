@@ -38,6 +38,8 @@ private ref const(NotificationConfig) config() {
 void notificationThread() {
     import core.time;
     bool exiting = false;
+    // this will just init the original poke time.
+    poke();
     // don't do pokes inside the worker
     auto lastPoke = MonoTime.currTime;
     Duration period = ServerinoProcess.isWorker ? Duration.max / 2 : config.periodSeconds.seconds;
@@ -93,13 +95,14 @@ private void poke() {
 
 SysTime lastHandledPoke;
 
-shared static this() {
-    lastHandledPoke = getTime();
-}
-
 public void handlePoke() {
     auto current = getTime();
     scope(exit) lastHandledPoke = current;
+
+    // on first run, just get the time and exit.
+    if(lastHandledPoke == SysTime.init)
+        return;
+
     auto curdate = cast(Date)current;
     DataSet!Event evds;
     if(curdate != cast(Date)lastHandledPoke) {
