@@ -5,6 +5,7 @@ block content
   - import std.datetime;
   - import alarmcal.dietutils;
   - import alarmcal.db;
+  - import alarmcal.app : getTime;
   - import std.traits;
   - import std.uri : encodeComponent;
   - import std.algorithm : map, any, count, joiner, canFind, filter;
@@ -20,7 +21,7 @@ block content
       - foreach(style; EnumMembers!DisplayStyle)
         option(value=(style), selected=(model.params.style == style)) #{style}
   h1 4H-Alarm Team 2079 Activity Calendar
-  - auto today = cast(Date)Clock.currTime();
+  - auto today = cast(Date)getTime();
   - auto myTodayEvents = model.cal.joiner.joiner.filter!(d => !d.isNull && d.get.date == today).map!(d => d.get.events.filter!(ev => ev.attendees.any!(att => att.person_id == currentUser.id))).joiner;
   - if (!myTodayEvents.empty)
     div#today-checkin
