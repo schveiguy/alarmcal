@@ -55,6 +55,7 @@ struct Config {
     EmailConfig email;
     @optional NotificationConfig notifications;
     @optional string timeZone = "US/Eastern";
+    @optional string host = "https://alarmcal.info";
 }
 
 shared Config config;

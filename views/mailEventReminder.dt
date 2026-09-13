@@ -11,12 +11,12 @@ html
       br
       | End: #{event.end}
 
-    p You can manage your participation in the event here: https://alarmcal.info
+    p You can manage your participation in the event here: #{hostname}
 
     - if(isAttending)
       p
         | Check in when you are the event by using the QR code at the location, or 
-        a(href="https://alarmcal.info/checkIn?askToConfirm=true&event_id=#{event.id}") this link
+        a(href="#{hostname}/checkIn?askToConfirm=true&event_id=#{event.id}") this link
         | .
 
     p #{emailDisclaimer}

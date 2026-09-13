@@ -6,6 +6,6 @@ html
     p You have been invited to join 4H Alarm Calendar. To finish creating your user, please click on the link below. Once you have created your user, this link will no longer work. If you find the link does not work, please contact the 4H Alarm mentor team to get your user reset.
 
     p
-      a(href="https://alarmcal.info/invite?id=#{person.invitation_id}") Accept Invitation
+      a(href="#{hostname}/invite?id=#{person.invitation_id}") Accept Invitation
 
     p #{emailDisclaimer}

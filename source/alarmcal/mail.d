@@ -27,10 +27,15 @@ private ref const(EmailConfig) config() {
     return *cast(const(EmailConfig)*)&appconfig.email;
 }
 
+private string hostname() {
+    import alarmcal.app : appconfig = config;
+    return appconfig.host;
+}
+
 private Email makeEmail(string subject) {
     Email result = new Email();
     return result
-        .setFrom("event@alarmcal.info", "Alarm Events")
+        .setFrom(config.username, "Alarm Events")
         .setSubject(subject);
 }
 
@@ -44,6 +49,7 @@ void sendEventEmail(Event event, string message, bool isAttending) {
 }
 
 void sendEventEmail(Event event, string message, bool isAttending, Person[] recipients...) {
+    import alarmcal.app : appconfig = config;
     foreach(r; recipients) {
         auto email = makeEmail(i"Event $(event.title) Notification".text)
             .setPlainTextBody(
@@ -53,12 +59,12 @@ $(fieldNameToCapitals(event.type.to!string)) Event: $(event.title)
 Start: $(event.start)
 End:   $(event.end)
 
-You have signed up for this event. You can manage your participation in the event here: https://alarmcal.info
+You have signed up for this event. You can manage your participation in the event here: $(hostname)
 
 $(isAttending ? "Check in when you are the event by using the QR code at the location, or\n" ~ 
-i"this link: https://alarmcal.info/checkIn?event_id=$(event.id)\n".text : "")
+i"this link: $(hostname)/checkIn?event_id=$(event.id)\n".text : "")
 $(emailDisclaimer)`.text)
-            .setHtmlBody(renderDiet!("mailEventReminder.dt", message, event, emailDisclaimer, isAttending))
+            .setHtmlBody(renderDiet!("mailEventReminder.dt", message, event, emailDisclaimer, isAttending, hostname))
             .addTo(r.email, r.name);
         dispatchEmail(email);
     }
@@ -74,10 +80,10 @@ please click on the link below. Once you have created your user, this link will
 no longer work. If you find the link does not work, please contact the 4H Alarm
 mentor team to get your user reset.
 
-https://alarmcal.info/invite?id=$(person.invitation_id)
+$(hostname)/invite?id=$(person.invitation_id)
 
 $(emailDisclaimer)`.text)
-        .setHtmlBody(renderDiet!("mailInvite.dt", person, emailDisclaimer))
+        .setHtmlBody(renderDiet!("mailInvite.dt", person, emailDisclaimer, hostname))
         .addTo(person.email, person.name);
     dispatchEmail(email);
 }
@@ -93,10 +99,10 @@ remain unchanged.
 
 This link will expire 20 minutes after this email was sent:
 
-https://alarmcal.info/forgotpassword?id=$(person.reset_password_id)
+$(hostname)/forgotpassword?id=$(person.reset_password_id)
 
 $(emailDisclaimer)`.text)
-        .setHtmlBody(renderDiet!("mailPasswordReset.dt", person, emailDisclaimer))
+        .setHtmlBody(renderDiet!("mailPasswordReset.dt", person, emailDisclaimer, hostname))
         .addTo(person.email, person.name);
     dispatchEmail(email);
 }
