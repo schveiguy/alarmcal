@@ -63,17 +63,21 @@ block content
                 td.day(class='#{d.get.date == today ? "today" : ""}')
                   - foreach(ev; d.get.events)
                     - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
+                    - bool iDeclined = ev.declined.any!(att => att.person_id == currentUser.id);
                     - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "INVALID LOCATION";
                     - auto locAddr = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].address : "";
                     - auto locMapsUrl = locAddr.length ? "https://www.google.com/maps/search/?api=1&query=" ~ encodeComponent(locAddr) : "";
                     - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, att.attendanceRecorded));
+                    - auto declinedJson = ev.declined.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, false));
                     - auto calStudentCount = ev.attendees.map!(att => model.people[att.person_id].memberType).count(MemberType.student);
                     - auto calStudentsMaxed = ev.event.maxStudents > 0 && calStudentCount >= ev.event.maxStudents && currentUser.memberType == MemberType.student;
                     p(class="event-type-#{ev.event.type}")
                       - if (imGoing)
                         span.attending_check(title="You are attending") &check; 
+                      - else if (iDeclined)
+                        span.declined_mark(title="You have declined") &cross; 
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-attendees=(attsJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults)) &#x2139;
+                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-i-declined=(iDeclined ? "true" : "false"), data-attendees=(attsJson), data-declined=(declinedJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults)) &#x2139;
   - else
     - auto hasHiddenData = model.cal.joiner.joiner.canFind!(d => !d.isNull && d.get.events.length > 0 && d.get.date < today);
     - if (hasHiddenData)
@@ -91,6 +95,7 @@ block content
                 |  (TODAY)
             - foreach(ev; d.get.events)
               - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
+              - bool iDeclined = ev.declined.any!(att => att.person_id == currentUser.id);
               - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
               - auto locAddr = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].address : "";
               - auto locMapsUrl = locAddr.length ? "https://www.google.com/maps/search/?api=1&query=" ~ encodeComponent(locAddr) : "";
@@ -106,6 +111,8 @@ block content
               p(class="event-type-#{ev.event.type}")
                 - if (imGoing)
                   span.attending_check(title="You are attending") &check; 
+                - else if (iDeclined)
+                  span.declined_mark(title="You have declined") &cross; 
                 | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
               p.em-meta
                 strong Type: 
@@ -146,14 +153,32 @@ block content
                           em  (not seen yet)
                         - else if(d.get.date < today)
                           em  (absent)
+              - if (ev.declined.length > 0)
+                div.em-declined
+                  h4 Declined (#{ev.declined.length})
+                  ul
+                    - foreach(att; ev.declined)
+                      - auto p = model.people[att.person_id];
+                      li #{p.name} - #{p.memberType}
               div
                 - if (d.get.date >= today)
                   - if (imGoing)
-                    a.em-button.em-cancel-rsvp(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") Cancel RSVP
-                  - else if (studentsMaxed)
-                    a.em-button.em-disabled(href="#") Full
+                    em You are attending this event.&nbsp;
+                    a.em-button.em-decline(href="/rsvp?event_id=#{ev.event.id}&response=declined&style=#{model.params.style}") Decline Instead
+                    | &nbsp;
+                    a.em-button.em-withdraw(href="/rsvp?event_id=#{ev.event.id}&response=none&style=#{model.params.style}") Remove Response
+                  - else if (iDeclined)
+                    em You have declined this event.&nbsp;
+                    a.em-button.em-attend(href="/rsvp?event_id=#{ev.event.id}&response=attending&style=#{model.params.style}") Attend Instead
+                    | &nbsp;
+                    a.em-button.em-withdraw(href="/rsvp?event_id=#{ev.event.id}&response=none&style=#{model.params.style}") Remove Response
                   - else
-                    a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&attending=#{!imGoing}&style=#{model.params.style}") RSVP
+                    - if (studentsMaxed)
+                      a.em-button.em-disabled(href="#") Full
+                    - else
+                      a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&response=attending&style=#{model.params.style}") RSVP
+                    | &nbsp;
+                    a.em-button.em-decline(href="/rsvp?event_id=#{ev.event.id}&response=declined&style=#{model.params.style}") Decline
                 - if(currentUser.admin)
                   | &nbsp;
                   a.em-button.em-edit(href="/editEvent?id=#{ev.event.id}") Edit

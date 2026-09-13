@@ -35,6 +35,15 @@ document.addEventListener('DOMContentLoaded', function () {
     return h + '</ul></div>';
   }
 
+  function declinedHtml(list) {
+    if (!list.length) return '';
+    var h = '<div class="em-declined"><h4>Declined (' + list.length + ')</h4><ul>';
+    list.forEach(function (a) {
+      h += '<li>' + esc(a.name) + ' <em>(' + esc(a.type) + ')</em></li>';
+    });
+    return h + '</ul></div>';
+  }
+
   function countsHtml(list, minStudents, maxStudents, minAdults) {
     var studentCount = list.filter(function(a) { return a.type === 'student'; }).length;
     var mentorCount  = list.filter(function(a) { return a.type === 'mentor';  }).length;
@@ -56,10 +65,13 @@ document.addEventListener('DOMContentLoaded', function () {
     var d = btn.dataset;
     var isAdmin = document.body.dataset.admin === 'true';
     var imGoing = d.imGoing === 'true';
+    var iDeclined = d.iDeclined === 'true';
     var eid = encodeURIComponent(d.eventId);
 
     var attendeeList = [];
     try { attendeeList = JSON.parse(d.attendees || '[]'); } catch (e) {}
+    var declinedList = [];
+    try { declinedList = JSON.parse(d.declined || '[]'); } catch (e) {}
     var minStudents = parseInt(d.minStudents, 10) || 0;
     var maxStudents = parseInt(d.maxStudents, 10) || 0;
     var minAdults   = parseInt(d.minAdults,   10) || 0;
@@ -69,10 +81,17 @@ document.addEventListener('DOMContentLoaded', function () {
     var rsvpHtml = isPast
       ? ''
       : imGoing
-        ? '<a class="em-cancel-rsvp" href="/rsvp?event_id=' + eid + '&attending=false">Cancel RSVP</a>'
-        : studentsMaxed
-          ? '<a class="em-disabled" href="#">Full</a>'
-          : '<a class="em-rsvp" href="/rsvp?event_id=' + eid + '&attending=true">RSVP</a>';
+        ? '<em class="em-declined-note">You are attending this event.</em>' +
+          '<a class="em-withdraw" href="/rsvp?event_id=' + eid + '&response=none">Remove Response</a>' +
+          '<a class="em-decline" href="/rsvp?event_id=' + eid + '&response=declined">Decline Instead</a>'
+        : iDeclined
+          ? '<em class="em-declined-note">You have declined this event.</em>' +
+            '<a class="em-attend" href="/rsvp?event_id=' + eid + '&response=attending">Attend Instead</a>' +
+            '<a class="em-withdraw" href="/rsvp?event_id=' + eid + '&response=none">Remove Response</a>'
+          : (studentsMaxed
+              ? '<a class="em-disabled" href="#">Full</a>'
+              : '<a class="em-rsvp" href="/rsvp?event_id=' + eid + '&response=attending">RSVP</a>') +
+            '<a class="em-decline" href="/rsvp?event_id=' + eid + '&response=declined">Decline</a>';
 
     var adminHtml = isAdmin
       ? '<a class="em-edit"   href="/editEvent?id='   + eid + '">Edit</a>' +
@@ -88,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<p class="em-meta"><strong>End:</strong> '     + esc(d.end)      + '</p>' +
       countsHtml(attendeeList, minStudents, maxStudents, minAdults) +
       attendeesHtml(attendeeList) +
+      declinedHtml(declinedList) +
       '<div class="em-actions">' + rsvpHtml + adminHtml + '</div>';
 
     modal.querySelector('.em-close').addEventListener('click', close);

@@ -38,7 +38,7 @@ void sendEventEmail(Event event, string message, bool isAttending) {
     import alarmcal.app : db;
     // find all the target users
     DataSet!PersonEvent peds;
-    Person[] recipients = db.fetch(select(peds.person).where(peds.event_id, " = ", event.id.param)).array;
+    Person[] recipients = db.fetch(select(peds.person).where(i"$(peds.event_id) = $(event.id) AND $(peds.attending) = 1")).array;
 
     sendEventEmail(event, message, isAttending, recipients);
 }

@@ -97,7 +97,7 @@ struct Event
     int minStudents; // minimum students required to hold the event.
     int minAdults; // minimum adults required to hold the event (at least one mentor)
     static @mapping("event_id") @refersTo!PersonEvent Relation people;
-    static @mapping("tag_id") @refersTo!Event Relation repeatedEvents;
+    static @mapping("tag_id", "tag_id") @refersTo!Event Relation repeatedEvents;
 }
 
 import std.traits;
@@ -105,10 +105,11 @@ static assert(hasUDA!(Event.location_id, dbenum));
 
 struct PersonEvent
 {
-    @primaryKey @autoIncrement int id; // needed for updating.
+    @primaryKey @autoIncrement int id = -1; // needed for updating.
     @mustReferTo!Person("person") int person_id;
     @mustReferTo!Event("event") int event_id;
     bool attendanceRecorded;
+    bool attending = true; // false if the person has explicitly declined the event
 }
 
 struct MigrationRecord
@@ -230,6 +231,7 @@ void applyMigrations()
         addSessionTable(),
         addPersonInvitations(),
         addPersonPasswordReset(),
+        addPersonEventAttending(),
     ];
 
     auto db = openDB();
@@ -345,5 +347,12 @@ Migration addPersonPasswordReset() {
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE Person ADD COLUMN reset_password_id TEXT DEFAULT NULL`);
     result.add(`ALTER TABLE Person ADD COLUMN reset_password_time TEXT DEFAULT NULL`);
+    return result;
+}
+
+Migration addPersonEventAttending() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE PersonEvent ADD COLUMN attending INTEGER NOT NULL DEFAULT 1`);
     return result;
 }

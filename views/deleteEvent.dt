@@ -34,7 +34,9 @@ block content
           - auto person = personMap[rsvp.person_id];
           li
             | #{person.name} (#{person.memberType})
-            - if(rsvp.attendanceRecorded)
+            - if(!rsvp.attending)
+              |  (declined)
+            - else if(rsvp.attendanceRecorded)
               |  (checked in)
 
   p.warning Are you sure you want to delete this event?

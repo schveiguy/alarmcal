@@ -198,7 +198,8 @@ Event extractEvent(string prefix="")(Request.SafeAccess!string data) {
 struct EventInfo
 {
     Event event;
-    PersonEvent[] attendees;
+    PersonEvent[] attendees; // people who RSVP'd as attending
+    PersonEvent[] declined; // people who RSVP'd as not attending
 }
 
 struct CalendarDay
@@ -234,7 +235,9 @@ Nullable!CalendarDay[][] getMonth(Date date, Event[][Date] events)
             foreach(ev; *evs) {
                 auto evi = EventInfo(ev);
                 DataSet!PersonEvent ds;
-                evi.attendees = db.fetch(select(ds).where(ds.event_id, " = ", ev.id.param)).array;
+                foreach(rsvp; db.fetch(select(ds).where(i"$(ds.event_id) = $(ev.id)"))) {
+                    (rsvp.attending ? evi.attendees : evi.declined) ~= rsvp;
+                }
                 cd.events ~= evi;
             }
         }
@@ -906,9 +909,16 @@ void performDeleteEvent(Request request, Output output) {
 @endpoint
 @getRoute!"/rsvp"
 void rsvp(Request request, Output output) {
+    // Possible responses a person can give when RSVP'ing to an event.
+    enum RSVPResponse {
+        attending, // signed up, counts towards event limits
+        declined, // explicitly not attending, does not count towards event limits
+        none, // withdraw any previous response
+    }
+
     static struct params {
         int event_id;
-        bool attending;
+        RSVPResponse response;
         @(form.optional) string style;
     }
     auto p = request.get.extract!params;
@@ -919,23 +929,50 @@ void rsvp(Request request, Output output) {
     }
     // check if the rsvp already exists
     DataSet!PersonEvent ds;
-    auto imGoing = db.fetchOne(select(count(ds.person_id)).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
-    if(imGoing) {
-        if(!p.attending) {
-            // remove the rsvp
-            db.perform(removeFrom(ds.tableDef).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
-            infof("Cancelled RSVP for event_id:%s by %s", p.event_id, currentUser.name);
-            sendEventEmail(ev, "You have cancelled your reservation.", isAttending: false, currentUser);
+    auto existing = db.fetchOne(select(ds).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event_id) = $(p.event_id)"), PersonEvent.init);
+
+    if(existing.id != -1) {
+        if(existing.attendanceRecorded)
+            return output.messageRedirect("Cannot change RSVP", "You have already checked in for this event, and cannot cancel or decline it.");
+
+        with(RSVPResponse) final switch(p.response) {
+            case none:
+                db.erase(existing);
+                infof("Withdrew RSVP for event_id:%s by %s", p.event_id, currentUser.name);
+                sendEventEmail(ev, "You have withdrawn your response for this event.", isAttending: false, currentUser);
+                break;
+            case attending:
+                if(!existing.attending) {
+                    existing.attending = true;
+                    db.save(existing);
+                    infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
+                    sendEventEmail(ev, "You have signed up for this event.", isAttending: true, currentUser);
+                }
+                break;
+            case declined:
+                if(existing.attending) {
+                    existing.attending = false;
+                    db.save(existing);
+                    infof("Declined event_id:%s by %s", p.event_id, currentUser.name);
+                    sendEventEmail(ev, "You have declined this event.", isAttending: false, currentUser);
+                }
+                break;
         }
     }
-    else if(p.attending) {
-        // add the rsvp
+    else if(p.response != RSVPResponse.none) {
+        // add the rsvp/decline
         db.create(PersonEvent(
                     person_id: currentUser.id,
                     event_id: p.event_id,
+                    attending: p.response == RSVPResponse.attending,
                     ));
-        infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
-        sendEventEmail(ev, "You have signed up for this event.", isAttending: true, currentUser);
+        if(p.response == RSVPResponse.attending) {
+            infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
+            sendEventEmail(ev, "You have signed up for this event.", isAttending: true, currentUser);
+        } else {
+            infof("Declined event_id:%s by %s", p.event_id, currentUser.name);
+            sendEventEmail(ev, "You have declined this event.", isAttending: false, currentUser);
+        }
     }
     output.redirect(p.style.length ? "/?style=" ~ p.style : "/");
 }
@@ -953,7 +990,7 @@ void checkIn(Request request, Output output) {
     if(p.location_id != -1) {
         // The person is checking in to all events today at this location
         auto today = cast(Date)getTime();
-        auto bq = select().where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.location_id) = $(p.location_id) AND date($(ds.event.start)) = $(today)");
+        auto bq = select().where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.location_id) = $(p.location_id) AND date($(ds.event.start)) = $(today) AND $(ds.attending) = $(true)");
         auto eventInfo = db.fetchOne(bq.select(count(ds.id), exprCol!(Nullable!long)("SUM(", ds.attendanceRecorded, ")")));
         if(eventInfo[0] == 0) {
             import std.format;
@@ -968,11 +1005,11 @@ void checkIn(Request request, Output output) {
             auto location = db.fetchUsingKey!Location(p.location_id);
             return output.renderDiet!("confirmCheckin.dt", events, location, currentUser);
         }
-        db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param));
+        db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event.location_id, " = ", p.location_id.param, " AND date(", ds.event.start, ") = ", today.param, " AND ", ds.attending, " = ", true.param));
         infof("Checked in %s to all events today at location_id:%s", currentUser.name, p.location_id);
         return output.messageRedirect("Checked in", "Thanks for checking in for today's event(s)!");
     } else if(p.event_id != -1) {
-        auto events = db.fetch(select(ds.event, ds.attendanceRecorded, ds.event.location).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.id) = $(p.event_id)")).array;
+        auto events = db.fetch(select(ds.event, ds.attendanceRecorded, ds.event.location).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.id) = $(p.event_id) AND $(ds.attending) = $(true)")).array;
         if(events.length == 0) {
             import std.format;
             return output.messageRedirect("Invalid checkin", format("You have not signed up for event %s, please RSVP before attempting to check in.", db.fetchUsingKey!Event(p.event_id).title));
@@ -985,7 +1022,7 @@ void checkIn(Request request, Output output) {
             auto location = events[0][2];
             return output.renderDiet!("confirmCheckin.dt", events, location, currentUser);
         }
-        db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param));
+        db.perform(set(ds.attendanceRecorded, true.param).where(ds.person_id, " = ", currentUser.id.param, " AND ", ds.event_id, " = ", p.event_id.param, " AND ", ds.attending, " = ", true.param));
         infof("Checked in %s to event_id:%s", currentUser.name, p.event_id);
         return output.redirect("/");
     } else {

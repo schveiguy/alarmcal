@@ -160,6 +160,10 @@ span.attending_check {
     color: green;
 }
 
+span.declined_mark {
+    color: #c55;
+}
+
 span.low_count {
     padding: 4px;
     background-color: #c55;
@@ -246,6 +250,12 @@ span.low_count {
 .em-attendees h4 { margin: 0 0 .25rem; }
 .em-attendees ul { margin: 0; padding-left: 1.25rem; font-size: .9rem; }
 
+.em-declined { margin-top: .75rem; }
+.em-declined h4 { margin: 0 0 .25rem; color: #c55; }
+.em-declined ul { margin: 0; padding-left: 1.25rem; font-size: .9rem; }
+
+.em-declined-note { display: block; margin-bottom: .4rem; width: 100%; }
+
 .em-actions {
   margin-top: 1rem;
   display: flex;
@@ -263,6 +273,9 @@ span.low_count {
 
 .em-rsvp        { background: #3a7; color: #fff; }
 .em-cancel-rsvp { background: #c55; color: #fff; }
+.em-decline     { background: #c80; color: #fff; }
+.em-attend      { background: #3a7; color: #fff; }
+.em-withdraw    { background: #888; color: #fff; }
 .em-edit        { background: #57b; color: #fff; }
 .em-delete      { background: #c55; color: #fff; }
 .em-disabled    { background: #555; color: #fff; }
