@@ -4,16 +4,27 @@ head
   link(rel="stylesheet", href="/assets/css/alarmcal.css")
   block extraHead
 body(data-admin=(currentUser.admin ? "true" : "false"))
-  div
+  nav.top-bar
     a.admin_tool(href="/") Home
     - if(currentUser.admin)
-      | Admin tools
-      a.admin_tool(href="/persons") Persons
-      a.admin_tool(href="/addPerson") Add Person
-      a.admin_tool(href="/addEvent") Add Event
-      a.admin_tool(href="/locations") Locations
-      a.admin_tool(href="/addLocation") Add Location
-    a.admin_tool(href="/logout") Logout
-    a.admin_tool(href="/editProfile") Edit Profile
+      details.dropdown
+        summary.admin_tool Admin tools
+        div.dropdown-menu
+          a(href="/persons") Persons
+          a(href="/addPerson") Add Person
+          a(href="/addEvent") Add Event
+          a(href="/locations") Locations
+          a(href="/addLocation") Add Location
+    details.dropdown
+      summary.admin_tool #{currentUser.name}
+      div.dropdown-menu
+        a(href="/editProfile") Edit Profile
+        a(href="/logout") Logout
+  script.
+    document.addEventListener('click', function (e) {
+      document.querySelectorAll('nav.top-bar details[open]').forEach(function (d) {
+        if (!d.contains(e.target)) d.removeAttribute('open');
+      });
+    });
   block content
 

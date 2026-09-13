@@ -87,6 +87,60 @@ table.cal_table th.month_title {
   background-color: #46a;
 }
 
+nav.top-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+details.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+details.dropdown summary.admin_tool {
+  list-style: none;
+}
+
+details.dropdown summary.admin_tool::-webkit-details-marker {
+  display: none;
+}
+
+details.dropdown summary.admin_tool::after {
+  content: " \25BE";
+}
+
+details.dropdown[open] summary.admin_tool {
+  background-color: #46a;
+}
+
+details.dropdown .dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  z-index: 10;
+  min-width: 140px;
+  overflow: hidden;
+}
+
+details.dropdown .dropdown-menu a {
+  display: block;
+  padding: 6px 12px;
+  color: #333;
+  text-decoration: none;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+details.dropdown .dropdown-menu a:hover {
+  background-color: #dde;
+}
+
 table.item-table {
   border-collapse: collapse;
   border-spacing: 0;
