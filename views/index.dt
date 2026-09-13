@@ -77,7 +77,12 @@ block content
                         - else if (iDeclined)
                           span.declined_mark(title="You have declined") &cross; 
                         | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                        button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-i-declined=(iDeclined ? "true" : "false"), data-attendees=(attsJson), data-declined=(declinedJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults)) &#x2139;
+                        button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-i-declined=(iDeclined ? "true" : "false"), data-attendees=(attsJson), data-declined=(declinedJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults))
+                          svg.info-icon(viewBox="0 0 24 24", xmlns="http://www.w3.org/2000/svg", aria-hidden="true", focusable="false")
+                            circle(cx="12", cy="5.3", r="2.0", fill="currentColor")
+                            rect(x="10.2", y="9", width="3.6", height="9.4", fill="currentColor")
+                            rect(x="8.7", y="8.4", width="5.1", height="1.5", rx="0.5", fill="currentColor")
+                            rect(x="8.8", y="17.2", width="6.4", height="1.8", rx="0.6", fill="currentColor")
   - else
     - auto hasHiddenData = model.cal.joiner.joiner.canFind!(d => !d.isNull && d.get.events.length > 0 && d.get.date < today);
     - if (hasHiddenData)
