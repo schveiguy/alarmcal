@@ -1,5 +1,16 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0 0.5em;
+  overflow-x: hidden;
 }
 
 section {
@@ -47,8 +58,12 @@ td.unused_day {
 td.unused_day_num {
   width: 100px;
 }
-table.cal_table {
+.cal-table-wrap {
+  overflow-x: auto;
   margin-top: 20px;
+}
+table.cal_table {
+  margin-top: 0;
   border-spacing: 0;
   border-collapse: collapse;
   border: 1px black solid;
@@ -90,7 +105,9 @@ table.cal_table th.month_title {
 nav.top-bar {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: 4px;
+  padding: 0.5em 0;
 }
 
 details.dropdown {
@@ -141,9 +158,14 @@ details.dropdown .dropdown-menu a:hover {
   background-color: #dde;
 }
 
+.table-wrap {
+  overflow-x: auto;
+}
+
 table.item-table {
   border-collapse: collapse;
   border-spacing: 0;
+  width: 100%;
 }
 
 table.item-table th,
@@ -372,3 +394,64 @@ span.low_count {
 
 .em-checkin     { background: #3a7; color: #fff; }
 .em-checked-in  { background: #888; color: #fff; cursor: default; }
+
+@media (max-width: 600px) {
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  section {
+    padding: 1em 0;
+  }
+
+  fieldset.datetime-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    border: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  fieldset.datetime-group input {
+    max-width: 100%;
+  }
+
+  td.day_num,
+  td.day,
+  td.unused_day,
+  td.unused_day_num {
+    width: 70px;
+  }
+
+  td.day {
+    height: 40px;
+    padding: 3px 4px;
+    font-size: 0.85rem;
+  }
+
+  p[class^="event-type-"] {
+    font-size: 0.85rem;
+  }
+
+  .event-btn {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  table.item-table th,
+  table.item-table td {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+
+  #event-modal {
+    padding: 1rem;
+    width: 94%;
+  }
+
+  .em-actions a, a.em-button, span.em-button {
+    padding: .5rem .8rem;
+    font-size: .85rem;
+  }
+}

@@ -6,23 +6,24 @@
 - import std.datetime;
 
 - void tableView(T)(T[] items, string editRoute)
-  table.item-table
-    thead
-      tr
-        - static foreach(idx; 0 .. T.tupleof.length)
-          - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
-            th #{getFieldLabel!(T.tupleof[idx])}
-        th
-    tbody
-      - foreach(item; items)
+  div.table-wrap
+    table.item-table
+      thead
         tr
           - static foreach(idx; 0 .. T.tupleof.length)
             - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
-              - static if(is(typeof(T.tupleof[idx]) == bool))
-                td #{item.tupleof[idx] ? "Yes" : "No"}
-              - else static if(is(typeof(T.tupleof[idx]) == DateTime))
-                td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
-              - else
-                td #{item.tupleof[idx]}
-          td
-            a.em-button.em-edit(href="#{editRoute}?id=#{item.id}") Edit
+              th #{getFieldLabel!(T.tupleof[idx])}
+          th
+      tbody
+        - foreach(item; items)
+          tr
+            - static foreach(idx; 0 .. T.tupleof.length)
+              - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
+                - static if(is(typeof(T.tupleof[idx]) == bool))
+                  td #{item.tupleof[idx] ? "Yes" : "No"}
+                - else static if(is(typeof(T.tupleof[idx]) == DateTime))
+                  td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
+                - else
+                  td #{item.tupleof[idx]}
+            td
+              a.em-button.em-edit(href="#{editRoute}?id=#{item.id}") Edit
