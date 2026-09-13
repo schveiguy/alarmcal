@@ -10,14 +10,14 @@
     thead
       tr
         - static foreach(idx; 0 .. T.tupleof.length)
-          - static if(!hasUDA!(T.tupleof[idx], password))
+          - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
             th #{getFieldLabel!(T.tupleof[idx])}
         th
     tbody
       - foreach(item; items)
         tr
           - static foreach(idx; 0 .. T.tupleof.length)
-            - static if(!hasUDA!(T.tupleof[idx], password))
+            - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
               - static if(is(typeof(T.tupleof[idx]) == bool))
                 td #{item.tupleof[idx] ? "Yes" : "No"}
               - else static if(is(typeof(T.tupleof[idx]) == DateTime))
