@@ -75,8 +75,6 @@ void dispatchEmail(Email email) {
 }
 
 private void handle(SendEmail sem) {
-    import std.stdio;
-    writeln("sending an email");
     sendEmail(sem.email);
 }
 

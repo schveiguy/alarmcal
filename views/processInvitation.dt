@@ -1,0 +1,19 @@
+doctype html
+head
+  title 4H Alarm Calendar - Invitation
+  link(rel="stylesheet", href="/assets/css/alarmcal.css")
+body
+  h1 Create your account
+  p Hello, #{newUser.email} you have been invited to join the calendar application!
+  p In order to participate, you must create your user account.
+  ul
+    li Member Type: #{newUser.memberType}
+    li Admin: #{newUser.admin ? "Yes" : "No"}
+    li Email: #{newUser.email}
+  include form
+  form(method="POST", action="/invitation?id=#{newUser.invitation_id}")
+    section
+      - import alarmcal.db;
+      - createForm(newUser, exceptThese: ["admin", "memberType", "email"]);
+    .form-group
+      button(type="submit") Create user

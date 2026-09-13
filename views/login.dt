@@ -7,6 +7,7 @@ body
   - if(error)
     p(style="color: red;") Invalid email or password.
   form(method="POST", action="/performLogin")
+    input(type="hidden", name="url", value="#{redirectUrl}")
     .form-group
       label(for="email") Email
       input(type="email", name="email", id="email", required)
@@ -15,3 +16,11 @@ body
       input(type="password", name="password", id="password", required)
     .form-group
       button(type="submit") Log in
+  h2 Forgot your password?
+  p Enter your email address and, if it matches an account, we'll send you a link to reset your password.
+  form(method="POST", action="/performForgotPassword")
+    .form-group
+      label(for="forgot_email") Email
+      input(type="email", name="email", id="forgot_email", required)
+    .form-group
+      button(type="submit") Send reset link

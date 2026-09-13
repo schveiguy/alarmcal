@@ -78,11 +78,11 @@ int main(string[] args)
         }
     }
 
+    infof("Loaded time zone: %s", cast()config.timeZone);
+
     // always apply migrations, but only from the main process
     if(!ServerinoProcess.isWorker)
         applyMigrations();
-
-    infof("Loaded time zone: %s", cast()config.timeZone);
 
     // intercept the "cli" subcommand
     if (args.length > 1 && args[1] == "cli")
@@ -302,10 +302,16 @@ void checkSession(Request request, Output output){
     }
 
     import std.algorithm : startsWith;
-    if(request.path == "/login" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/"))
+    if(request.path == "/login" || request.path == "/invitation" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/")
+            || request.path == "/forgotpassword" || request.path == "/performForgotPassword")
         return;
 
-    output.redirect("/login");
+    auto url = "/login";
+    if(request.method == Request.Method.Get) {
+        import std.uri;
+        url = "/login?url=" ~ encodeComponent(request.path);
+    }
+    output.redirect(url);
 }
 
 @endpoint
@@ -314,7 +320,8 @@ void loginForm(Request request, Output output) {
     if(currentUser.id != -1)
         return output.redirect("/");
     bool error = false;
-    output.renderDiet!("login.dt", error);
+    string redirectUrl = request.get.read("url", "/");
+    output.renderDiet!("login.dt", error, redirectUrl);
 }
 
 @endpoint
@@ -325,21 +332,130 @@ void performLogin(Request request, Output output) {
 
     auto email = request.post.read("email", "");
     auto password = request.post.read("password", "");
+    auto redirectUrl = request.post.read("url", "/");
     DataSet!Person ds;
-    auto candidate = db.fetchOne(select(ds).where(ds.email, " = ", email.param), Person.init);
+    // disable logins if your user is just invited. They must use the invite link.
+    auto candidate = db.fetchOne(select(ds).where(i"$(ds.email) = $(email) AND $(ds.invitation_id) IS NULL"), Person.init);
     import botan.passhash.bcrypt;
     if(candidate.id == -1 || candidate.password_hash == "" || !checkBcrypt(password, candidate.password_hash)) {
         warningf("Failed login attempt for email %s", email);
         output.status = 401;
         bool error = true;
-        return output.renderDiet!("login.dt", error);
+        return output.renderDiet!("login.dt", error, redirectUrl);
     }
 
     auto session = startSession(db, candidate.id);
     setSessionCookie(request, output, session.token);
     infof("User %s logged in", candidate.email);
-    output.redirect("/");
+    output.redirect(redirectUrl);
 }
+
+@endpoint
+@route!"/invitation"
+void handleInvitation(Request request, Output output) {
+    if(currentUser.id != -1)
+    {
+        // already logged in, log the user out
+        endSession(db, request.cookie.read("session", ""));
+        currentUser = Person.init;
+        currentSession = Session.init;
+    }
+    auto id = request.get.read("id", "");
+    DataSet!Person ds;
+    auto newUser = db.fetchOne(select(ds).where(i"$(ds.invitation_id) = $(id)"), Person.init);
+    if(newUser.id == -1) {
+        output.status = 400;
+        return output.renderDiet!("invalidInvite.dt");
+    }
+    if(request.method == Request.Method.Get) {
+        return output.renderDiet!("processInvitation.dt", newUser);
+    }
+    else if(request.method == Request.Method.Post) {
+        // clear the password
+        newUser.password_hash = "";
+        request.post.extract(newUser, exceptThese: ["admin", "memberType", "email"]);
+        if(newUser.password_hash == "") {
+            output.status = 400;
+            return output.messageRedirect("Password required", "Password required for creating your account");
+        }
+        // new password should be set, clear the invitation
+        newUser.invitation_id.nullify();
+        db.save(newUser);
+        infof("Person with email %s used their invitation with id %s to register their account", newUser.email, id);
+        infof("Person id:%d '%s' set their password via account registration", newUser.id, newUser.name);
+        return output.renderDiet!("invitationUsed.dt", newUser);
+    }
+}
+
+enum passwordResetValidDuration = 20.minutes;
+
+@endpoint
+@postRoute!"/performForgotPassword"
+void performForgotPassword(Request request, Output output) {
+    if(currentUser.id != -1)
+        return output.redirect("/");
+
+    auto email = request.post.read("email", "");
+    DataSet!Person ds;
+    auto candidate = db.fetchOne(select(ds).where(i"$(ds.email) = $(email)"), Person.init);
+    if(candidate.id != -1) {
+        candidate.reset_password_id = generateSessionToken();
+        candidate.reset_password_time = cast(DateTime)getTime();
+        db.save(candidate);
+        infof("Password reset requested for person id:%d '%s' (%s), reset code generated", candidate.id, candidate.name, candidate.email);
+        sendPasswordResetEmail(candidate);
+    }
+    else {
+        infof("Password reset requested for unknown email %s", email);
+    }
+    output.renderDiet!("passwordResetSent.dt");
+}
+
+@endpoint
+@route!"/forgotpassword"
+void handleForgotPassword(Request request, Output output) {
+    if(currentUser.id != -1)
+    {
+        // already logged in, log the user out
+        endSession(db, request.cookie.read("session", ""));
+        currentUser = Person.init;
+        currentSession = Session.init;
+    }
+    auto id = request.get.read("id", "");
+    DataSet!Person ds;
+    auto candidate = db.fetchOne(select(ds).where(i"$(ds.reset_password_id) = $(id)"), Person.init);
+    auto now = cast(DateTime)getTime();
+    bool valid = candidate.id != -1 && !candidate.reset_password_time.isNull &&
+        (now - candidate.reset_password_time.get) <= passwordResetValidDuration;
+    if(!valid) {
+        output.status = 400;
+        return output.renderDiet!("invalidPasswordReset.dt");
+    }
+    static struct Parameters {
+        @(form.password) string password;
+    }
+    if(request.method == Request.Method.Get) {
+        return output.renderDiet!("resetPassword.dt", candidate, Parameters);
+    }
+    else if(request.method == Request.Method.Post) {
+        // clear the password
+        candidate.password_hash = "";
+        auto p = request.post.extract!Parameters;
+        if(p.password == "") {
+            output.status = 400;
+            return output.messageRedirect("Password required", "Password field required. Use the back button to try again.");
+        }
+        // new password has been set, clear the reset code
+        candidate.reset_password_id.nullify();
+        candidate.reset_password_time.nullify();
+        candidate.password_hash = p.password;
+        db.save(candidate);
+        endAllSessions(db, candidate.id);
+        infof("Person id:%d '%s' changed their password via forgot-password link, all sessions invalidated", candidate.id, candidate.name);
+        return output.renderDiet!("passwordResetComplete.dt", candidate);
+    }
+}
+
 
 @endpoint
 @getRoute!"/logout"
@@ -498,15 +614,29 @@ void performAddPerson(Request request, Output output) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a person");
     }
+    auto isInvite = request.post.read("sendInvite", "false") == "true";
     auto p = request.post.extract!Person();
-    if(p.password_hash == null)
+    if(!isInvite && p.password_hash == null)
     {
         output.status = 400;
-        return output.messageRedirect("Forbidden", "Password required for adding a person");
+        return output.messageRedirect("Password required", "Password required for adding a person");
     }
-    import std.stdio;
+    if(isInvite) {
+        // generate a new random invitation
+        import botan.rng.auto_rng;
+        import std.digest : toHexString, LetterCase;
+
+        scope AutoSeededRNG rng = new AutoSeededRNG;
+        ubyte[32] buf;
+        rng.randomize(buf.ptr, buf.length);
+        p.invitation_id = toHexString!(LetterCase.lower)(buf).idup;
+    }
     db.create(p);
-    infof("Created person named %s of type %s", p.name, p.memberType);
+    infof("Created person with email %s named %s of type %s", p.email, p.name, p.memberType);
+    if(isInvite) {
+        infof("Email invitation sent to %s", p.email);
+        sendInviteEmail(p);
+    }
     output.redirect("/");
 }
 

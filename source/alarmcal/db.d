@@ -58,6 +58,9 @@ struct Person
 {
     @primaryKey @autoIncrement int id = -1;
     MemberType memberType;
+    @noform Nullable!string invitation_id;
+    @noform Nullable!string reset_password_id;
+    @noform Nullable!DateTime reset_password_time;
     string name;
     string email;
     @password @label("Password") string password_hash;
@@ -224,7 +227,9 @@ void applyMigrations()
 {
     Migration[] migrations = [
         addRepeatEventTags(),
-        addSessionTable()
+        addSessionTable(),
+        addPersonInvitations(),
+        addPersonPasswordReset(),
     ];
 
     auto db = openDB();
@@ -325,5 +330,20 @@ Migration addSessionTable()
     Migration result;
     result.name = __FUNCTION__;
     result.add((Database db) { db.execute(createTableSql!(Session, true));});
+    return result;
+}
+
+Migration addPersonInvitations() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Person ADD COLUMN invitation_id TEXT DEFAULT NULL`);
+    return result;
+}
+
+Migration addPersonPasswordReset() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Person ADD COLUMN reset_password_id TEXT DEFAULT NULL`);
+    result.add(`ALTER TABLE Person ADD COLUMN reset_password_time TEXT DEFAULT NULL`);
     return result;
 }

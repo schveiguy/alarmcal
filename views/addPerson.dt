@@ -9,3 +9,6 @@ block content
       - createForm!Person();
     .form-group
       button(type="submit") Submit
+      label
+        input(type="checkbox", checked=true, name="sendInvite", value="true")
+        |  Send Email Invitation

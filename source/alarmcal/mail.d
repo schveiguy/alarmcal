@@ -27,6 +27,13 @@ private ref const(EmailConfig) config() {
     return *cast(const(EmailConfig)*)&appconfig.email;
 }
 
+private Email makeEmail(string subject) {
+    Email result = new Email();
+    return result
+        .setFrom("event@alarmcal.info", "Alarm Events")
+        .setSubject(subject);
+}
+
 void sendEventEmail(Event event, string message, bool isAttending) {
     import alarmcal.app : db;
     // find all the target users
@@ -38,9 +45,7 @@ void sendEventEmail(Event event, string message, bool isAttending) {
 
 void sendEventEmail(Event event, string message, bool isAttending, Person[] recipients...) {
     foreach(r; recipients) {
-        auto email = new Email();
-        email.setFrom("event@alarmcal.info", "Alarm Events")
-            .setSubject(i"Event $(event.title) Notification".text)
+        auto email = makeEmail(i"Event $(event.title) Notification".text)
             .setPlainTextBody(
 i`$(message)
 
@@ -57,6 +62,43 @@ $(emailDisclaimer)`.text)
             .addTo(r.email, r.name);
         dispatchEmail(email);
     }
+}
+
+void sendInviteEmail(Person person) {
+    auto email = makeEmail("You are invited to join Alarm calendar!")
+        .setPlainTextBody(
+i`Hello $(person.name.length > 0 ? person.name : person.email)!
+
+You have been invited to join 4H Alarm Calendar. To finish creating your user,
+please click on the link below. Once you have created your user, this link will
+no longer work. If you find the link does not work, please contact the 4H Alarm
+mentor team to get your user reset.
+
+https://alarmcal.info/invite?id=$(person.invitation_id)
+
+$(emailDisclaimer)`.text)
+        .setHtmlBody(renderDiet!("mailInvite.dt", person, emailDisclaimer))
+        .addTo(person.email, person.name);
+    dispatchEmail(email);
+}
+
+void sendPasswordResetEmail(Person person) {
+    auto email = makeEmail("Reset your Alarm calendar password")
+        .setPlainTextBody(
+i`Hello $(person.name.length > 0 ? person.name : person.email)!
+
+A password reset was requested for your 4H Alarm Calendar account. If you did
+not request this, you can safely ignore this email and your password will
+remain unchanged.
+
+This link will expire 20 minutes after this email was sent:
+
+https://alarmcal.info/forgotpassword?id=$(person.reset_password_id)
+
+$(emailDisclaimer)`.text)
+        .setHtmlBody(renderDiet!("mailPasswordReset.dt", person, emailDisclaimer))
+        .addTo(person.email, person.name);
+    dispatchEmail(email);
 }
 
 void sendEmail(Email email) {

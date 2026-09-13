@@ -1,0 +1,10 @@
+doctype html
+html
+  head
+    title Welcome to the team!
+    link(rel="stylesheet", href="/assets/css/alarmcal.css")
+  body
+    h1 Registration successful!
+    p Thank you for registering, #{newUser.name}. Your account has been activated. To log in go to the #[a(href="/login") login page] and use the new password you created.
+    p
+      i NOTE: The invitation you used is not valid after one use. If you forget your password, use the reset password form on the login page.
