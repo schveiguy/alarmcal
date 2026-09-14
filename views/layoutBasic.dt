@@ -1,0 +1,9 @@
+doctype html
+head
+  block title
+    title 4H Alarm Calendar
+  meta(name="viewport", content="width=device-width, initial-scale=1")
+  link(rel="stylesheet", href="/assets/css/alarmcal.css")
+  block extraHead
+body
+  block content
