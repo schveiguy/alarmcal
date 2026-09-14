@@ -306,7 +306,7 @@ void checkSession(Request request, Output output){
     }
 
     import std.algorithm : startsWith;
-    if(request.path == "/login" || request.path == "/invitation" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/")
+    if(request.path == "/login" || request.path == "/invite" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/")
             || request.path == "/forgotpassword" || request.path == "/performForgotPassword")
         return;
 
@@ -355,7 +355,7 @@ void performLogin(Request request, Output output) {
 }
 
 @endpoint
-@route!"/invitation"
+@route!"/invite"
 void handleInvitation(Request request, Output output) {
     if(currentUser.id != -1)
     {
@@ -452,6 +452,7 @@ void handleForgotPassword(Request request, Output output) {
         // new password has been set, clear the reset code
         candidate.reset_password_id.nullify();
         candidate.reset_password_time.nullify();
+        candidate.invitation_id.nullify();
         candidate.password_hash = p.password;
         db.save(candidate);
         endAllSessions(db, candidate.id);

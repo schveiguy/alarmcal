@@ -11,7 +11,7 @@ body
     li Admin: #{newUser.admin ? "Yes" : "No"}
     li Email: #{newUser.email}
   include form
-  form(method="POST", action="/invitation?id=#{newUser.invitation_id}")
+  form(method="POST", action="/invite?id=#{newUser.invitation_id}")
     section
       - import alarmcal.db;
       - createForm(newUser, exceptThese: ["admin", "memberType", "email"]);
