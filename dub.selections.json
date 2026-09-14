@@ -8,7 +8,7 @@
 		"iopipe": "0.2.5",
 		"jsoniopipe": "0.2.7",
 		"memutils": "1.0.14",
-		"postino": "0.1.4",
+		"postino": "~main",
 		"serverino": "0.7.21",
 		"sqlbuilder": "0.3.0"
 	}

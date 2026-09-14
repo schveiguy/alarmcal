@@ -7,6 +7,7 @@ import alarmcal.notifications : dispatchEmail;
 import std.conv;
 import std.concurrency;
 import std.array;
+import std.logger;
 
 import sqlbuilder.dataset;
 import sqlbuilder.dialect.sqlite;
@@ -20,6 +21,7 @@ struct EmailConfig {
     string smtpUrl;
     string username;
     string password;
+    @optional bool disabled = false;
 }
 
 private ref const(EmailConfig) config() {
@@ -108,5 +110,15 @@ $(emailDisclaimer)`.text)
 }
 
 void sendEmail(Email email) {
-    email.send(config.smtpUrl, config.username, config.password);
+    if(config.disabled) {
+        import std.conv;
+        import alarmcal.app : getTime;
+        auto t = getTime();
+        string emailFilename = i"email_$(getTime).eml".text;
+        infof("Email disabled, saving to eml file %s", emailFilename);
+        email.save(emailFilename);
+    }
+    else {
+        email.send(config.smtpUrl, config.username, config.password);
+    }
 }

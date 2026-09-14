@@ -931,6 +931,9 @@ void rsvp(Request request, Output output) {
     // check if the rsvp already exists
     DataSet!PersonEvent ds;
     auto existing = db.fetchOne(select(ds).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event_id) = $(p.event_id)"), PersonEvent.init);
+    auto studentCount = db.fetchOne(select(count(ds.id)).where(i"$(ds.event_id) = $(p.event_id) AND $(ds.attending) = 1 AND $(ds.person.memberType) = $(MemberType.student)"));
+
+    auto eventFull = ev.maxStudents > 0 && studentCount >= ev.maxStudents;
 
     if(existing.id != -1) {
         if(existing.attendanceRecorded)
@@ -944,6 +947,11 @@ void rsvp(Request request, Output output) {
                 break;
             case attending:
                 if(!existing.attending) {
+                    if(eventFull) {
+                        // can't now sign up for this event
+                        output.status = 403;
+                        return output.messageRedirect("Event Full", i"The event has reached its capacity of $(ev.maxStudents) students.".text);
+                    }
                     existing.attending = true;
                     db.save(existing);
                     infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
@@ -962,6 +970,11 @@ void rsvp(Request request, Output output) {
     }
     else if(p.response != RSVPResponse.none) {
         // add the rsvp/decline
+        if(p.response == RSVPResponse.attending && eventFull) {
+            // can't now sign up for this event
+            output.status = 403;
+            return output.messageRedirect("Event Full", i"The event has reached its capacity of $(ev.maxStudents) students.".text);
+        }
         db.create(PersonEvent(
                     person_id: currentUser.id,
                     event_id: p.event_id,
