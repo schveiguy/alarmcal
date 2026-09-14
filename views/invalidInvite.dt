@@ -1,10 +1,8 @@
-doctype html
-html
-  head
-    title Invalid invitation
-    link(rel="stylesheet", href="/assets/css/alarmcal.css")
-  body
-    h1 Invalid invitation
-    p The invitation you have clicked on is not valid. Please request a new one from the mentor team in slack.
-    p
-      i NOTE: invitations expire after they are used. If you did not use this invitation, someone else may have. Please contact the mentor team ASAP if this has happened. If you are trying to reset your password, use the password reset form on the #[a(href="/login") login page].
+extends layoutBasic
+block title
+  title Invalid invitation
+block content
+  h1 Invalid invitation
+  p The invitation you have clicked on is not valid. Please request a new one from the mentor team in slack.
+  p
+    i NOTE: invitations expire after they are used. If you did not use this invitation, someone else may have. Please contact the mentor team ASAP if this has happened. If you are trying to reset your password, use the password reset form on the #[a(href="/login") login page].

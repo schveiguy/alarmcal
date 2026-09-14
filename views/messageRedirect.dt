@@ -1,7 +1,5 @@
-doctype html
-head
-  link(rel="stylesheet", href="/assets/css/alarmcal.css")
-body
+extends layoutBasic
+block content
   h1 #{result}
   p #{message}
   p

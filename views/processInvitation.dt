@@ -1,8 +1,7 @@
-doctype html
-head
+extends layoutBasic
+block title
   title 4H Alarm Calendar - Invitation
-  link(rel="stylesheet", href="/assets/css/alarmcal.css")
-body
+block content
   h1 Create your account
   p Hello, #{newUser.email} you have been invited to join the calendar application!
   p In order to participate, you must create your user account.
