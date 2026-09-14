@@ -506,7 +506,7 @@ void index(Request request, Output output)
     Date maxDate = minDate;
     auto query = select(ds).where(ds.start, " >= ", DateTime(minDate, TimeOfDay(0, 0, 0)).param);
     if (model.params.my_events) {
-        query = query.where(ds.people.person_id, " = ", currentUser.id.param);
+        query = query.where(i"$(ds.people.person_id) = $(currentUser.id) AND $(ds.people.attending) = 1");
     }
     foreach(ev; db.fetch(query))
     {
