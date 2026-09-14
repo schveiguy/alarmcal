@@ -14,6 +14,8 @@ import sqlbuilder.dialect.sqlite;
 
 import postino;
 
+import iopipe.json.serialize : optional;
+
 enum emailDisclaimer = `NOTE: This email is generated from an automated system, replying to it will not reach a real person. If you have questions, please contact a mentor on slack`;
 
 // configured from config file
