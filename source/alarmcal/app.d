@@ -305,7 +305,7 @@ void checkSession(Request request, Output output){
         return;
     }
 
-    import std.algorithm : startsWith;
+    import std.algorithm : startsWith, splitter;
     if(request.path == "/login" || request.path == "/invite" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/")
             || request.path == "/forgotpassword" || request.path == "/performForgotPassword")
         return;
@@ -313,7 +313,10 @@ void checkSession(Request request, Output output){
     auto url = "/login";
     if(request.method == Request.Method.Get) {
         import std.uri;
-        url = "/login?url=" ~ encodeComponent(request.path);
+        auto target = request.requestLine.splitter;
+        enforce(target.front == "GET");
+        target.popFront;
+        url = "/login?url=" ~ encodeComponent(target.front);
     }
     output.redirect(url);
 }
