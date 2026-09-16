@@ -313,10 +313,7 @@ void checkSession(Request request, Output output){
     auto url = "/login";
     if(request.method == Request.Method.Get) {
         import std.uri;
-        auto target = request.requestLine.splitter;
-        enforce(target.front == "GET");
-        target.popFront;
-        url = "/login?url=" ~ encodeComponent(target.front);
+        url = "/login?url=" ~ encodeComponent(request.rawUri);
     }
     output.redirect(url);
 }
