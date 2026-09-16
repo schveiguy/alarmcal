@@ -209,6 +209,20 @@ struct CalendarDay
     EventInfo[] events; // sorted by start time
 }
 
+private void generateInvite(ref Person p) {
+    import botan.rng.auto_rng;
+    import std.digest : toHexString, LetterCase;
+
+    scope AutoSeededRNG rng = new AutoSeededRNG;
+    ubyte[32] buf;
+    rng.randomize(buf.ptr, buf.length);
+    p.invitation_id = toHexString!(LetterCase.lower)(buf).idup;
+
+    // disable any password reset information
+    p.reset_password_id.nullify;
+    p.reset_password_time.nullify;
+}
+
 @requestScope
 {
     Person currentUser;
@@ -339,7 +353,7 @@ void performLogin(Request request, Output output) {
     auto redirectUrl = request.post.read("url", "/");
     DataSet!Person ds;
     // disable logins if your user is just invited. They must use the invite link.
-    auto candidate = db.fetchOne(select(ds).where(i"$(ds.email) = $(email) AND $(ds.invitation_id) IS NULL"), Person.init);
+    auto candidate = db.fetchOne(select(ds).where(i"$(ds.email) = $(email) AND $(ds.invitation_id) IS NULL AND $(ds.active) = 1"), Person.init);
     import botan.passhash.bcrypt;
     if(candidate.id == -1 || candidate.password_hash == "" || !checkBcrypt(password, candidate.password_hash)) {
         warningf("Failed login attempt for email %s", email);
@@ -377,7 +391,7 @@ void handleInvitation(Request request, Output output) {
     else if(request.method == Request.Method.Post) {
         // clear the password
         newUser.password_hash = "";
-        request.post.extract(newUser, exceptThese: ["admin", "memberType", "email"]);
+        request.post.extract(newUser, exceptThese: ["admin", "memberType", "email", "active"]);
         if(newUser.password_hash == "") {
             output.status = 400;
             return output.messageRedirect("Password required", "Password required for creating your account");
@@ -402,7 +416,7 @@ void performForgotPassword(Request request, Output output) {
     auto email = request.post.read("email", "");
     DataSet!Person ds;
     auto candidate = db.fetchOne(select(ds).where(i"$(ds.email) = $(email)"), Person.init);
-    if(candidate.id != -1) {
+    if(candidate.id != -1 && candidate.active) {
         candidate.reset_password_id = generateSessionToken();
         candidate.reset_password_time = cast(DateTime)getTime();
         db.save(candidate);
@@ -410,7 +424,10 @@ void performForgotPassword(Request request, Output output) {
         sendPasswordResetEmail(candidate);
     }
     else {
-        infof("Password reset requested for unknown email %s", email);
+        if(candidate.id == -1)
+            infof("Password reset requested for unknown email %s", email);
+        else
+            infof("Password reset requested for inactive user %s with email %s", candidate.id, email);
     }
     output.renderDiet!("passwordResetSent.dt");
 }
@@ -627,17 +644,10 @@ void performAddPerson(Request request, Output output) {
         return output.messageRedirect("Password required", "Password required for adding a person");
     }
     if(isInvite) {
-        // generate a new random invitation
-        import botan.rng.auto_rng;
-        import std.digest : toHexString, LetterCase;
-
-        scope AutoSeededRNG rng = new AutoSeededRNG;
-        ubyte[32] buf;
-        rng.randomize(buf.ptr, buf.length);
-        p.invitation_id = toHexString!(LetterCase.lower)(buf).idup;
+        p.generateInvite();
     }
     db.create(p);
-    infof("Created person with email %s named %s of type %s", p.email, p.name, p.memberType);
+    infof("Created person id:%s '%s' type=%s email=%s admin=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.active, currentUser.name);
     if(isInvite) {
         infof("Email invitation sent to %s", p.email);
         sendInviteEmail(p);
@@ -705,13 +715,24 @@ void performEditPerson(Request request, Output output) {
     auto p = db.fetchUsingKey!Person(request.post.read("id").to!int);
     auto origPW = p.password_hash;
     request.post.extract(p);
+
+    auto resend_invitation = request.post.read("resend_invite", "false").to!bool;
+    if (resend_invitation && !p.invitation_id.isNull) {
+        // regenerate an invitation
+        p.generateInvite();
+    }
     auto pwChanged = origPW != p.password_hash;
     db.save(p);
     if(pwChanged) {
         endAllSessions(db, p.id);
         infof("Password changed for person id:%s '%s' by %s, all sessions invalidated", p.id, p.name, currentUser.name);
     }
-    infof("Updated person id:%s '%s' type=%s admin=%s by %s", p.id, p.name, p.memberType, p.admin, currentUser.name);
+    infof("Updated person id:%s '%s' type=%s email=%s admin=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.active, currentUser.name);
+
+    if(resend_invitation) {
+        infof("Email invitation sent to %s", p.email);
+        sendInviteEmail(p);
+    }
     output.redirect("/persons");
 }
 
@@ -726,7 +747,7 @@ void editProfileForm(Request request, Output output) {
 void performEditProfile(Request request, Output output) {
     import std.conv : to;
     auto p = currentUser;
-    request.post.extract(p, exceptThese: ["admin", "memberType"]);
+    request.post.extract(p, exceptThese: ["admin", "memberType", "active"]);
     auto pwChanged = currentUser.password_hash != p.password_hash;
     db.save(p);
     if(pwChanged) {

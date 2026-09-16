@@ -65,6 +65,7 @@ struct Person
     string email;
     @password @label("Password") string password_hash;
     bool admin;
+    bool active = true;
 
     static @mapping("person_id") @refersTo!PersonEvent Relation events;
 }
@@ -232,6 +233,7 @@ void applyMigrations()
         addPersonInvitations(),
         addPersonPasswordReset(),
         addPersonEventAttending(),
+        addPersonActive(),
     ];
 
     auto db = openDB();
@@ -354,5 +356,12 @@ Migration addPersonEventAttending() {
     Migration result;
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE PersonEvent ADD COLUMN attending INTEGER NOT NULL DEFAULT 1`);
+    return result;
+}
+
+Migration addPersonActive() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Person ADD COLUMN active INTEGER NOT NULL DEFAULT 1`);
     return result;
 }

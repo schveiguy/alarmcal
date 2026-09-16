@@ -7,5 +7,12 @@ block content
     input(type="hidden", name="id", value=(item.id))
     section
       - createForm(item);
+      - if (!item.invitation_id.isNull)
+        p
+          i Note: this user has never logged in and has an outstanding invitation
+        .form-group
+          label
+            input(type="checkbox", checked=false, name="resend_invite", value="true")
+            |  Resend Invitation
     .form-group
       button(type="submit") Submit
