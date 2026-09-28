@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', function () {
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
+  /* id of the event currently shown in the modal, so a data refresh can update it in place */
+  var openEventId = null;
+
   /* ---------- Helpers ---------- */
   function esc(s) {
     return String(s)
@@ -22,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function close() {
     overlay.classList.remove('open');
+    openEventId = null;
   }
 
   function attendeesHtml(list) {
@@ -61,7 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- Open modal ---------- */
-  function openModal(btn) {
+  function openModal(btn, silent) {
     var d = btn.dataset;
     var isAdmin = document.body.dataset.admin === 'true';
     var imGoing = d.imGoing === 'true';
@@ -112,8 +116,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
     modal.querySelector('.em-close').addEventListener('click', close);
     overlay.classList.add('open');
-    modal.querySelector('.em-close').focus();
+    openEventId = d.eventId;
+    if (!silent) modal.querySelector('.em-close').focus();
   }
+
+  /* ---------- Refresh modal contents in place after a data refresh ---------- */
+  function refreshOpenModal() {
+    if (!overlay.classList.contains('open') || openEventId == null) return;
+    var btn = document.querySelector('.event-btn[data-event-id="' + CSS.escape(openEventId) + '"]');
+    if (btn) {
+      openModal(btn, true);
+    } else {
+      // the event is gone from the refreshed data (e.g. deleted)
+      close();
+    }
+  }
+  window.refreshOpenEventPopup = refreshOpenModal;
 
   /* ---------- Wire up events ---------- */
   overlay.addEventListener('click', function (e) {
@@ -126,17 +144,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.addEventListener('click', function (e) {
     var btn = e.target.closest && e.target.closest('.event-btn');
-    if (btn) { e.preventDefault(); openModal(btn); }
-  });
+    if (btn) { e.preventDefault(); openModal(btn); return; }
 
-  /* ---------- Show past events ---------- */
-  var showPastBtn = document.getElementById('show-past');
-  if (showPastBtn) {
-    showPastBtn.addEventListener('click', function () {
+    /* ---------- Show past events (delegated: content is replaced by autorefresh.js) ---------- */
+    var showPastBtn = e.target.closest && e.target.closest('#show-past');
+    if (showPastBtn) {
       document.querySelectorAll('.hidden_data').forEach(function (el) {
         el.classList.add('revealed');
       });
       showPastBtn.style.display = 'none';
-    });
-  }
+    }
+  });
 });
