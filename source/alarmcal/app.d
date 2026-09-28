@@ -16,6 +16,7 @@ import std.typecons;
 import std.logger;
 import std.exception;
 import std.concurrency;
+import std.algorithm;
 
 import sqlbuilder.dialect.sqlite;
 import sqlbuilder.dataset;
@@ -142,7 +143,6 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, 
     import sqlbuilder.uda;
     import std.stdio;
     import std.string : strip;
-    import std.algorithm : canFind;
 
     static foreach(idx; 0 .. T.tupleof.length) {
         static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)){
@@ -324,8 +324,16 @@ void checkSession(Request request, Output output){
     }
 
     import std.algorithm : startsWith, splitter;
-    if(request.path == "/login" || request.path == "/invite" || request.path == "/performLogin" || request.path == "/poke" || request.path.startsWith("/assets/")
-            || request.path == "/forgotpassword" || request.path == "/performForgotPassword")
+    static immutable nonAuthPaths = [
+        "/login",
+        "/invite",
+        "/performLogin",
+        "/poke",
+        "/forgotpassword",
+        "/performForgotPassword",
+        "/calendarData",
+    ];
+    if(nonAuthPaths.canFind(request.path) || request.path.startsWith("/assets/"))
         return;
 
     auto url = "/login";
@@ -556,6 +564,11 @@ void index(Request request, Output output)
 @getRoute!"/calendarData"
 void calendarData(Request request, Output output)
 {
+    // if not logged in, then return an error instead, we don't want to redirect to login.
+    if(currentSession.id == -1) {
+        output.status = 401;
+        return;
+    }
     auto model = buildIndexViewModel(request);
     output.renderDiet!("calendarFragment.dt", model, currentUser);
 }
@@ -574,7 +587,6 @@ void addEventForm(Request request, Output output) {
 @postRoute!"/performAddEvent"
 void performAddEvent(Request request, Output output) {
     import std.conv : to;
-    import std.algorithm : canFind;
     if(!currentUser.admin) {
         output.status = 403;
         return output.messageRedirect("Forbidden", "Only administrators can add a new event");

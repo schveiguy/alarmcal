@@ -5,10 +5,17 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!container) return;
 
   var url = container.dataset.refreshUrl;
+  var banner = document.getElementById('session-expired-banner');
 
   function refresh() {
     fetch(url + location.search, { credentials: 'same-origin' })
-      .then(function (res) { return res.ok ? res.text() : Promise.reject(res.status); })
+      .then(function (res) {
+        if (res.status === 401) {
+          if (banner) banner.hidden = false;
+          return Promise.reject(401);
+        }
+        return res.ok ? res.text() : Promise.reject(res.status);
+      })
       .then(function (html) {
         container.innerHTML = html;
         if (window.refreshOpenEventPopup) window.refreshOpenEventPopup();

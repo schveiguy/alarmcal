@@ -5,6 +5,8 @@ head
   link(rel="stylesheet", href="/assets/css/alarmcal.css")
   block extraHead
 body(data-admin=(currentUser.admin ? "true" : "false"))
+  div#session-expired-banner.session-expired-banner(hidden)
+    | You have been logged out. Please refresh the page to log in again.
   nav.top-bar
     a.admin_tool(href="/") Home
     - if(currentUser.admin)

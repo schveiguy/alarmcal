@@ -102,6 +102,14 @@ table.cal_table th.month_title {
   background-color: #46a;
 }
 
+.session-expired-banner {
+  background-color: #c55;
+  color: #fff;
+  text-align: center;
+  font-weight: bold;
+  padding: 0.6em 1em;
+}
+
 nav.top-bar {
   display: flex;
   align-items: flex-start;
