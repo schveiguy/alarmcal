@@ -60,8 +60,9 @@ void sendEventEmail(Event event, string message, bool isAttending, Person[] reci
 i`$(message)
 
 $(fieldNameToCapitals(event.type.to!string)) Event: $(event.title)
-Start: $(event.start)
-End:   $(event.end)
+Date:  $(event.start.date.fullDatePrinter)
+Start: $(event.start.timeOfDay.timePrinter)
+End:   $(event.end.timeOfDay.timePrinter)
 
 You have signed up for this event. You can manage your participation in the event here: $(hostname)
 

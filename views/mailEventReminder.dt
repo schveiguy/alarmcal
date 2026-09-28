@@ -1,15 +1,18 @@
 html
   body
     - import alarmcal.formudas;
+    - import alarmcal.dietutils;
     - import std.conv : to;
     h1 #{message}
 
     p
       | #{fieldNameToCapitals(event.type.to!string)} Event: #{event.title}
       br
-      | Start: #{event.start}
+      | Date: #{event.start.date.fullDatePrinter}
       br
-      | End: #{event.end}
+      | Start: #{event.start.timeOfDay.timePrinter}
+      br
+      | End: #{event.end.timeOfDay.timePrinter}
 
     p You can manage your participation in the event here: #{hostname}
 

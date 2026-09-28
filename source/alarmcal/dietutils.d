@@ -43,6 +43,18 @@ auto datePrinter(Date d)
     return DP(d);
 }
 
+auto fullDatePrinter(Date d)
+{
+    static struct DP {
+        Date d;
+        void toString(Out)(Out output) {
+            import std.format;
+            output.formattedWrite("%s %s %d, %04d", dayNames[d.dayOfWeek], monthNames[d.month], d.day, d.year);
+        }
+    }
+    return DP(d);
+}
+
 auto timePrinter(TimeOfDay tod)
 {
     static immutable hourLookup = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
