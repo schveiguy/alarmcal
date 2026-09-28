@@ -201,6 +201,10 @@ struct EventInfo
     Event event;
     PersonEvent[] attendees; // people who RSVP'd as attending
     PersonEvent[] declined; // people who RSVP'd as not attending
+    bool isSignedUp(int id) {
+        import std.algorithm : canFind;
+        return attendees.canFind!((ref PersonEvent pe, int id) => pe.person_id == id)(id);
+    }
 }
 
 struct CalendarDay

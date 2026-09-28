@@ -1,5 +1,6 @@
 module alarmcal.mail;
 import alarmcal.db;
+import alarmcal.app : EventInfo;
 import alarmcal.dietutils;
 import alarmcal.formudas : fieldNameToCapitals;
 import alarmcal.notifications : dispatchEmail;
@@ -75,35 +76,39 @@ $(emailDisclaimer)`.text)
     }
 }
 
-struct WeeklyDigestEvent {
-    Event event;
-    bool signedUp;
-}
-
-void sendWeeklyDigestEmail(Person recipient, WeeklyDigestEvent[] events) {
+void sendWeeklyDigestEmail(Person recipient, EventInfo[] events) {
     import std.algorithm : count;
 
-    auto signedUpCount = events.count!(we => we.signedUp);
+    if(events.length == 0)
+        // no events scheduled.
+        return;
+
+    auto signedUpCount = events.count!((ref EventInfo ev) => ev.isSignedUp(recipient.id));
 
     auto plainBody = appender!string;
-    plainBody ~= i"Hello $(recipient.name.length > 0 ? recipient.name : recipient.email)!\n\n".text;
-    if(events.length == 0) {
-        plainBody ~= "There are no events scheduled for the coming week.\n\n";
+    plainBody ~=
+i`Hello $(recipient.name)!
+
+
+There are $(events.length) event(s) scheduled for the coming week. You are signed up for $(signedUpCount) of them.
+`.text;
+
+    foreach(we; events) {
+        plainBody ~=
+i`
+
+$(fieldNameToCapitals(we.event.type.to!string)) Event: $(we.event.title)
+Date:  $(we.event.start.date.fullDatePrinter)
+Start: $(we.event.start.timeOfDay.timePrinter)
+End:   $(we.event.end.timeOfDay.timePrinter)
+$(we.isSignedUp(recipient.id) ? "You are signed up for this event" : "")`.text;
     }
-    else {
-        plainBody ~= i"There are $(events.length) event(s) scheduled for the coming week. You are signed up for $(signedUpCount) of them.\n\n".text;
-        foreach(we; events) {
-            plainBody ~= i"$(fieldNameToCapitals(we.event.type.to!string)) Event: $(we.event.title)\n".text;
-            plainBody ~= i"Date:  $(we.event.start.date.fullDatePrinter)\n".text;
-            plainBody ~= i"Start: $(we.event.start.timeOfDay.timePrinter)\n".text;
-            plainBody ~= i"End:   $(we.event.end.timeOfDay.timePrinter)\n".text;
-            if(we.signedUp)
-                plainBody ~= "You are signed up for this event.\n";
-            plainBody ~= "\n";
-        }
-    }
-    plainBody ~= i"You can manage your participation in these events here: $(hostname)\n\n".text;
-    plainBody ~= emailDisclaimer;
+
+    plainBody ~=
+i`
+You can manage your participation in these events here: $(hostname)
+
+$(emailDisclaimer)`.text;
 
     auto email = makeEmail("Upcoming Week's Events")
         .setPlainTextBody(plainBody[])

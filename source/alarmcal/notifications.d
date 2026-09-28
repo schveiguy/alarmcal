@@ -1,6 +1,6 @@
 module alarmcal.notifications;
 import alarmcal.db;
-import alarmcal.app : db, getTime;
+import alarmcal.app : db, getTime, EventInfo;
 import alarmcal.mail;
 
 import postino : Email;
@@ -8,6 +8,7 @@ import std.concurrency;
 import std.logger;
 import std.datetime;
 import std.array;
+import std.algorithm;
 import core.time;
 
 import serverino;
@@ -103,6 +104,7 @@ public void handlePoke() {
 
     auto curdate = cast(Date)current;
     DataSet!Event evds;
+
     if(curdate != cast(Date)lastHandledPoke) {
         // at the beginning of each day, email everyone who is signed up about
         // the events that are happening that day.
@@ -126,28 +128,23 @@ private void sendWeeklyDigest(Date weekStartExclusive) {
     DataSet!Event evds;
     auto weekEvents = db.fetch(select(evds)
         .where(i"date($(evds.start)) > date($(weekStartExclusive)) AND date($(evds.start)) <= date($(weekEnd))")
-        .orderBy(evds.start)).array;
+        .orderBy(evds.start, evds.id))
+        .map!(ev => EventInfo(ev))
+        .array;
 
-    DataSet!Person pds;
-    auto recipients = db.fetch(select(pds)
-        .where(i"$(pds.active) = 1 AND ($(pds.memberType) = $(MemberType.student) OR $(pds.memberType) = $(MemberType.mentor))")).array;
-
-    if(weekEvents.length == 0 || recipients.length == 0)
+    if(weekEvents.length == 0)
         return;
 
     DataSet!PersonEvent peds;
-    auto rsvps = db.fetch(select(peds)
-        .where(i"$(peds.attending) = 1 AND date($(peds.event.start)) > date($(weekStartExclusive)) AND date($(peds.event.start)) <= date($(weekEnd))")).array;
+    foreach(ref we; weekEvents) {
+        we.attendees = db.fetch(select(peds).where(i"$(peds.event_id) = $(we.event.id) AND $(peds.attending) = 1")).array;
+    }
 
-    bool[int][int] signedUpEvents; // person_id -> set of event_id
-    foreach(rsvp; rsvps)
-        signedUpEvents[rsvp.person_id][rsvp.event_id] = true;
+    DataSet!Person pds;
+    auto recipQuery = select(pds)
+        .where(i"$(pds.active) = 1 AND ($(pds.memberType) = $(MemberType.student) OR $(pds.memberType) = $(MemberType.mentor))");
 
-    foreach(recipient; recipients) {
-        auto mine = recipient.id in signedUpEvents;
-        WeeklyDigestEvent[] digestEvents;
-        foreach(ev; weekEvents)
-            digestEvents ~= WeeklyDigestEvent(ev, mine !is null && (ev.id in *mine) !is null);
-        sendWeeklyDigestEmail(recipient, digestEvents);
+    foreach(recipient; db.fetch(recipQuery)) {
+        sendWeeklyDigestEmail(recipient, weekEvents);
     }
 }

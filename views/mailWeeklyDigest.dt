@@ -5,25 +5,22 @@ html
     - import std.conv : to;
     h1 Upcoming Week's Events
 
-    p Hello #{recipient.name.length > 0 ? recipient.name : recipient.email}!
+    p Hello #{recipient.name}!
 
-    - if(events.length == 0)
-      p There are no events scheduled for the coming week.
-    - else
-      p There are #{events.length} event(s) scheduled for the coming week. You are signed up for #{signedUpCount} of them.
+    p There are #{events.length} event(s) scheduled for the coming week. You are signed up for #{signedUpCount} of them.
 
-      - foreach(we; events)
-        p
-          | #{fieldNameToCapitals(we.event.type.to!string)} Event: #{we.event.title}
+    - foreach(we; events)
+      p
+        | #{fieldNameToCapitals(we.event.type.to!string)} Event: #{we.event.title}
+        br
+        | Date: #{we.event.start.date.fullDatePrinter}
+        br
+        | Start: #{we.event.start.timeOfDay.timePrinter}
+        br
+        | End: #{we.event.end.timeOfDay.timePrinter}
+        - if(we.isSignedUp(recipient.id))
           br
-          | Date: #{we.event.start.date.fullDatePrinter}
-          br
-          | Start: #{we.event.start.timeOfDay.timePrinter}
-          br
-          | End: #{we.event.end.timeOfDay.timePrinter}
-          - if(we.signedUp)
-            br
-            strong You are signed up for this event.
+          strong You are signed up for this event.
 
     p You can manage your participation in these events here: #{hostname}
 
