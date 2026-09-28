@@ -110,5 +110,44 @@ public void handlePoke() {
         foreach(ev; events) {
             sendEventEmail(ev, "This event is occurring today!", true);
         }
+
+        // at the beginning of Sunday, email students and mentors about the
+        // week ahead (Monday through the following Sunday, i.e. excluding
+        // today and including next Sunday).
+        if(curdate.dayOfWeek == DayOfWeek.sun) {
+            sendWeeklyDigest(curdate);
+        }
+    }
+}
+
+private void sendWeeklyDigest(Date weekStartExclusive) {
+    auto weekEnd = weekStartExclusive + 7.days;
+
+    DataSet!Event evds;
+    auto weekEvents = db.fetch(select(evds)
+        .where(i"date($(evds.start)) > date($(weekStartExclusive)) AND date($(evds.start)) <= date($(weekEnd))")
+        .orderBy(evds.start)).array;
+
+    DataSet!Person pds;
+    auto recipients = db.fetch(select(pds)
+        .where(i"$(pds.active) = 1 AND ($(pds.memberType) = $(MemberType.student) OR $(pds.memberType) = $(MemberType.mentor))")).array;
+
+    if(weekEvents.length == 0 || recipients.length == 0)
+        return;
+
+    DataSet!PersonEvent peds;
+    auto rsvps = db.fetch(select(peds)
+        .where(i"$(peds.attending) = 1 AND date($(peds.event.start)) > date($(weekStartExclusive)) AND date($(peds.event.start)) <= date($(weekEnd))")).array;
+
+    bool[int][int] signedUpEvents; // person_id -> set of event_id
+    foreach(rsvp; rsvps)
+        signedUpEvents[rsvp.person_id][rsvp.event_id] = true;
+
+    foreach(recipient; recipients) {
+        auto mine = recipient.id in signedUpEvents;
+        WeeklyDigestEvent[] digestEvents;
+        foreach(ev; weekEvents)
+            digestEvents ~= WeeklyDigestEvent(ev, mine !is null && (ev.id in *mine) !is null);
+        sendWeeklyDigestEmail(recipient, digestEvents);
     }
 }

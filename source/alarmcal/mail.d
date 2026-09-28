@@ -75,6 +75,43 @@ $(emailDisclaimer)`.text)
     }
 }
 
+struct WeeklyDigestEvent {
+    Event event;
+    bool signedUp;
+}
+
+void sendWeeklyDigestEmail(Person recipient, WeeklyDigestEvent[] events) {
+    import std.algorithm : count;
+
+    auto signedUpCount = events.count!(we => we.signedUp);
+
+    auto plainBody = appender!string;
+    plainBody ~= i"Hello $(recipient.name.length > 0 ? recipient.name : recipient.email)!\n\n".text;
+    if(events.length == 0) {
+        plainBody ~= "There are no events scheduled for the coming week.\n\n";
+    }
+    else {
+        plainBody ~= i"There are $(events.length) event(s) scheduled for the coming week. You are signed up for $(signedUpCount) of them.\n\n".text;
+        foreach(we; events) {
+            plainBody ~= i"$(fieldNameToCapitals(we.event.type.to!string)) Event: $(we.event.title)\n".text;
+            plainBody ~= i"Date:  $(we.event.start.date.fullDatePrinter)\n".text;
+            plainBody ~= i"Start: $(we.event.start.timeOfDay.timePrinter)\n".text;
+            plainBody ~= i"End:   $(we.event.end.timeOfDay.timePrinter)\n".text;
+            if(we.signedUp)
+                plainBody ~= "You are signed up for this event.\n";
+            plainBody ~= "\n";
+        }
+    }
+    plainBody ~= i"You can manage your participation in these events here: $(hostname)\n\n".text;
+    plainBody ~= emailDisclaimer;
+
+    auto email = makeEmail("Upcoming Week's Events")
+        .setPlainTextBody(plainBody[])
+        .setHtmlBody(renderDiet!("mailWeeklyDigest.dt", recipient, events, signedUpCount, emailDisclaimer, hostname))
+        .addTo(recipient.email, recipient.name);
+    dispatchEmail(email);
+}
+
 void sendInviteEmail(Person person) {
     auto email = makeEmail("You are invited to join Alarm calendar!")
         .setPlainTextBody(
