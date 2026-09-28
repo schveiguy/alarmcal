@@ -339,22 +339,23 @@ void checkSession(Request request, Output output){
 @endpoint
 @getRoute!"/login"
 void loginForm(Request request, Output output) {
-    if(currentUser.id != -1)
-        return output.redirect("/");
-    bool error = false;
     string redirectUrl = request.get.read("url", "/");
+    if(currentUser.id != -1)
+        return output.redirect(redirectUrl);
+    bool error = false;
     output.renderDiet!("login.dt", error, redirectUrl);
 }
 
 @endpoint
 @postRoute!"/performLogin"
 void performLogin(Request request, Output output) {
+    auto redirectUrl = request.post.read("url", "/");
     if(currentUser.id != -1)
-        return output.redirect("/");
+        // log out the current user, they are not going to be logged in any more.
+        endSession(db, request.cookie.read("session", ""));
 
     auto email = request.post.read("email", "");
     auto password = request.post.read("password", "");
-    auto redirectUrl = request.post.read("url", "/");
     DataSet!Person ds;
     // disable logins if your user is just invited. They must use the invite link.
     auto candidate = db.fetchOne(select(ds).where(i"$(ds.email) = $(email) AND $(ds.invitation_id) IS NULL AND $(ds.active) = 1"), Person.init);
