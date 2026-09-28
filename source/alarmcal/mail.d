@@ -1,5 +1,6 @@
 module alarmcal.mail;
 import alarmcal.db;
+import alarmcal.app : EventInfo;
 import alarmcal.dietutils;
 import alarmcal.formudas : fieldNameToCapitals;
 import alarmcal.notifications : dispatchEmail;
@@ -73,6 +74,47 @@ $(emailDisclaimer)`.text)
             .addTo(r.email, r.name);
         dispatchEmail(email);
     }
+}
+
+void sendWeeklyDigestEmail(Person recipient, EventInfo[] events) {
+    import std.algorithm : count;
+
+    if(events.length == 0)
+        // no events scheduled.
+        return;
+
+    auto signedUpCount = events.count!((ref EventInfo ev) => ev.isSignedUp(recipient.id));
+
+    auto plainBody = appender!string;
+    plainBody ~=
+i`Hello $(recipient.name)!
+
+
+There are $(events.length) event(s) scheduled for the coming week. You are signed up for $(signedUpCount) of them.
+`.text;
+
+    foreach(we; events) {
+        plainBody ~=
+i`
+
+$(fieldNameToCapitals(we.event.type.to!string)) Event: $(we.event.title)
+Date:  $(we.event.start.date.fullDatePrinter)
+Start: $(we.event.start.timeOfDay.timePrinter)
+End:   $(we.event.end.timeOfDay.timePrinter)
+$(we.isSignedUp(recipient.id) ? "You are signed up for this event" : "")`.text;
+    }
+
+    plainBody ~=
+i`
+You can manage your participation in these events here: $(hostname)
+
+$(emailDisclaimer)`.text;
+
+    auto email = makeEmail("Upcoming Week's Events")
+        .setPlainTextBody(plainBody[])
+        .setHtmlBody(renderDiet!("mailWeeklyDigest.dt", recipient, events, signedUpCount, emailDisclaimer, hostname))
+        .addTo(recipient.email, recipient.name);
+    dispatchEmail(email);
 }
 
 void sendInviteEmail(Person person) {

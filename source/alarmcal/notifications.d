@@ -1,6 +1,6 @@
 module alarmcal.notifications;
 import alarmcal.db;
-import alarmcal.app : db, getTime;
+import alarmcal.app : db, getTime, EventInfo;
 import alarmcal.mail;
 
 import postino : Email;
@@ -8,6 +8,7 @@ import std.concurrency;
 import std.logger;
 import std.datetime;
 import std.array;
+import std.algorithm;
 import core.time;
 
 import serverino;
@@ -103,6 +104,7 @@ public void handlePoke() {
 
     auto curdate = cast(Date)current;
     DataSet!Event evds;
+
     if(curdate != cast(Date)lastHandledPoke) {
         // at the beginning of each day, email everyone who is signed up about
         // the events that are happening that day.
@@ -110,5 +112,39 @@ public void handlePoke() {
         foreach(ev; events) {
             sendEventEmail(ev, "This event is occurring today!", true);
         }
+
+        // at the beginning of Sunday, email students and mentors about the
+        // week ahead (Monday through the following Sunday, i.e. excluding
+        // today and including next Sunday).
+        if(curdate.dayOfWeek == DayOfWeek.sun) {
+            sendWeeklyDigest(curdate);
+        }
+    }
+}
+
+private void sendWeeklyDigest(Date weekStartExclusive) {
+    auto weekEnd = weekStartExclusive + 7.days;
+
+    DataSet!Event evds;
+    auto weekEvents = db.fetch(select(evds)
+        .where(i"date($(evds.start)) > date($(weekStartExclusive)) AND date($(evds.start)) <= date($(weekEnd))")
+        .orderBy(evds.start, evds.id))
+        .map!(ev => EventInfo(ev))
+        .array;
+
+    if(weekEvents.length == 0)
+        return;
+
+    DataSet!PersonEvent peds;
+    foreach(ref we; weekEvents) {
+        we.attendees = db.fetch(select(peds).where(i"$(peds.event_id) = $(we.event.id) AND $(peds.attending) = 1")).array;
+    }
+
+    DataSet!Person pds;
+    auto recipQuery = select(pds)
+        .where(i"$(pds.active) = 1 AND ($(pds.memberType) = $(MemberType.student) OR $(pds.memberType) = $(MemberType.mentor))");
+
+    foreach(recipient; db.fetch(recipQuery)) {
+        sendWeeklyDigestEmail(recipient, weekEvents);
     }
 }
