@@ -508,9 +508,7 @@ void messageRedirect(Output output, string result, string message)
     output.renderDiet!("messageRedirect.dt", result, message);
 }
 
-@endpoint
-@getRoute!"/"
-void index(Request request, Output output)
+IndexViewModel buildIndexViewModel(Request request)
 {
     IndexViewModel model;
     request.get.extract(model.params);
@@ -531,7 +529,6 @@ void index(Request request, Output output)
         if(ev.start.date > maxDate) maxDate = ev.start.date;
         events.require(ev.start.date) ~= ev;
     }
-    import std.stdio;
     while(minDate <= maxDate)
     {
         model.cal ~= getMonth(minDate, events);
@@ -539,7 +536,23 @@ void index(Request request, Output output)
     }
     model.people = getPersonMap();
     model.locations = getLocationMap();
+    return model;
+}
+
+@endpoint
+@getRoute!"/"
+void index(Request request, Output output)
+{
+    auto model = buildIndexViewModel(request);
     output.renderDiet!("index.dt", model, currentUser);
+}
+
+@endpoint
+@getRoute!"/calendarData"
+void calendarData(Request request, Output output)
+{
+    auto model = buildIndexViewModel(request);
+    output.renderDiet!("calendarFragment.dt", model, currentUser);
 }
 
 @endpoint
@@ -1083,6 +1096,12 @@ void alarmcalCss(Request request, Output output) {
 @getRoute!"/assets/js/eventpopup.js"
 void eventPopupJs(Request request, Output output) {
     output.serveStaticFile("views/eventpopup.js", "text/javascript; charset=utf-8");
+}
+
+@endpoint
+@getRoute!"/assets/js/autorefresh.js"
+void autoRefreshJs(Request request, Output output) {
+    output.serveStaticFile("views/autorefresh.js", "text/javascript; charset=utf-8");
 }
 
 @endpoint
