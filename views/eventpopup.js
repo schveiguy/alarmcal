@@ -82,6 +82,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var isPast = d.isPast === 'true';
     var studentsMaxed = d.studentsMaxed === 'true';
+    var noProspects = d.noProspects === 'true';
+    var hidePeople = d.hidePeople === 'true';
     var rsvpHtml = isPast
       ? ''
       : imGoing
@@ -92,7 +94,9 @@ document.addEventListener('DOMContentLoaded', function () {
           ? '<em class="em-declined-note">You have declined this event.</em>' +
             '<a class="em-attend" href="/rsvp?event_id=' + eid + '&response=attending">Attend Instead</a>' +
             '<a class="em-withdraw" href="/rsvp?event_id=' + eid + '&response=none">Remove Response</a>'
-          : (studentsMaxed
+          : (noProspects
+              ? '<a class="em-disabled" href="#">Not open to prospects</a>'
+              : studentsMaxed
               ? '<a class="em-disabled" href="#">Full</a>'
               : '<a class="em-rsvp" href="/rsvp?event_id=' + eid + '&response=attending">RSVP</a>') +
             '<a class="em-decline" href="/rsvp?event_id=' + eid + '&response=declined">Decline</a>';
@@ -104,14 +108,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     modal.innerHTML =
       '<button class="em-close" aria-label="Close">&times;</button>' +
-      '<h2 class="em-title">' + esc(d.title) + '</h2>' +
+      '<h2 class="em-title">' + esc(d.title) +
+        (d.prospectsAllowed === 'true' ? ' <span class="prospect-badge" title="Prospects allowed">P</span>' : '') + '</h2>' +
       '<p class="em-meta"><strong>Type:</strong> '     + esc(d.type)     + '</p>' +
       (d.location ? '<p class="em-meta"><strong>Location:</strong> ' + (d.locationUrl ? '<a href="' + esc(d.locationUrl) + '" target="_blank" rel="noopener">' + esc(d.location) + '</a>' : esc(d.location)) + '</p>' : '') +
       '<p class="em-meta"><strong>Start:</strong> '   + esc(d.start)    + '</p>' +
       '<p class="em-meta"><strong>End:</strong> '     + esc(d.end)      + '</p>' +
       countsHtml(attendeeList, minStudents, maxStudents, minAdults) +
-      attendeesHtml(attendeeList) +
-      declinedHtml(declinedList) +
+      (hidePeople
+        ? '<p class="em-meta"><em>' + attendeeList.length + ' attending</em></p>'
+        : attendeesHtml(attendeeList) + declinedHtml(declinedList)) +
       '<div class="em-actions">' + rsvpHtml + adminHtml + '</div>';
 
     modal.querySelector('.em-close').addEventListener('click', close);

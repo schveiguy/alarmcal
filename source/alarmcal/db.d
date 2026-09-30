@@ -66,6 +66,7 @@ struct Person
     @password @label("Password") string password_hash;
     bool admin;
     bool active = true;
+    bool prospect; // has not yet joined the team; limited to prospect-friendly events, and cannot see other attendees
 
     static @mapping("person_id") @refersTo!PersonEvent Relation events;
 }
@@ -97,6 +98,7 @@ struct Event
     int maxStudents; // limit to how many students can attend, 0 = no limit.
     int minStudents; // minimum students required to hold the event.
     int minAdults; // minimum adults required to hold the event (at least one mentor)
+    bool prospectsAllowed; // whether prospects may RSVP to this event
     static @mapping("event_id") @refersTo!PersonEvent Relation people;
     static @mapping("tag_id", "tag_id") @refersTo!Event Relation repeatedEvents;
 }
@@ -234,6 +236,8 @@ void applyMigrations()
         addPersonPasswordReset(),
         addPersonEventAttending(),
         addPersonActive(),
+        addPersonProspect(),
+        addEventProspectsAllowed(),
     ];
 
     auto db = openDB();
@@ -363,5 +367,19 @@ Migration addPersonActive() {
     Migration result;
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE Person ADD COLUMN active INTEGER NOT NULL DEFAULT 1`);
+    return result;
+}
+
+Migration addPersonProspect() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Person ADD COLUMN prospect INTEGER NOT NULL DEFAULT 0`);
+    return result;
+}
+
+Migration addEventProspectsAllowed() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Event ADD COLUMN prospectsAllowed INTEGER NOT NULL DEFAULT 0`);
     return result;
 }

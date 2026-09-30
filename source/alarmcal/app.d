@@ -131,13 +131,13 @@ string getPasswordHash(string input) {
     return generateBcrypt(input, rng, 10);
 }
 
-T extract(T, string prefix="")(Request.SafeAccess!string data, string[] exceptThese = []) {
+T extract(T, string prefix="")(Request.SafeAccess!string data, string[] onlyThese = []) {
     T result;
-    data.extract(result, exceptThese);
+    data.extract(result, onlyThese);
     return result;
 }
 
-void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, string[] exceptThese = []) {
+void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, string[] onlyThese = []) {
     import std.traits;
     import std.conv;
     import sqlbuilder.uda;
@@ -146,7 +146,7 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, 
 
     static foreach(idx; 0 .. T.tupleof.length) {
         static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)){
-            if(!exceptThese.canFind(__traits(identifier, T.tupleof[idx]))) {
+            if(onlyThese.length == 0 || onlyThese.canFind(__traits(identifier, T.tupleof[idx]))) {
                 alias FT = typeof(target.tupleof[idx]);
                 enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
                 static if(hasUDA!(target.tupleof[idx], form.password)) {
@@ -404,7 +404,7 @@ void handleInvitation(Request request, Output output) {
     else if(request.method == Request.Method.Post) {
         // clear the password
         newUser.password_hash = "";
-        request.post.extract(newUser, exceptThese: ["admin", "memberType", "email", "active"]);
+        request.post.extract(newUser, onlyThese: ["name", "password_hash"]);
         if(newUser.password_hash == "") {
             output.status = 400;
             return output.messageRedirect("Password required", "Password required for creating your account");
@@ -534,6 +534,9 @@ IndexViewModel buildIndexViewModel(Request request)
     Event[][Date] events;
     Date maxDate = minDate;
     auto query = select(ds).where(ds.start, " >= ", DateTime(minDate, TimeOfDay(0, 0, 0)).param);
+    // filter events for prospects
+    if(currentUser.prospect)
+        query = query.where(i"$(ds.prospectsAllowed) = 1");
     if (model.params.my_events) {
         query = query.where(i"$(ds.people.person_id) = $(currentUser.id) AND $(ds.people.attending) = 1");
     }
@@ -777,7 +780,7 @@ void editProfileForm(Request request, Output output) {
 void performEditProfile(Request request, Output output) {
     import std.conv : to;
     auto p = currentUser;
-    request.post.extract(p, exceptThese: ["admin", "memberType", "active"]);
+    request.post.extract(p, onlyThese: ["name", "email", "password_hash"]);
     auto pwChanged = currentUser.password_hash != p.password_hash;
     db.save(p);
     if(pwChanged) {
@@ -880,6 +883,7 @@ void performEditEvent(Request request, Output output) {
                 ev.maxStudents = e.maxStudents;
                 ev.minStudents = e.minStudents;
                 ev.minAdults = e.minAdults;
+                ev.prospectsAllowed = e.prospectsAllowed;
                 ev.start = DateTime(ev.start.date, e.start.timeOfDay);
                 ev.end = ev.start + duration;
                 db.save(ev);
@@ -979,6 +983,10 @@ void rsvp(Request request, Output output) {
     if(ev.id == -1) {
         output.status = 400;
         return output.messageRedirect("Invalid event", i"Invalid event id provided: $(p.event_id)".text);
+    }
+    if(currentUser.prospect && !ev.prospectsAllowed && p.response == RSVPResponse.attending) {
+        output.status = 403;
+        return output.messageRedirect("Not allowed", "This event is not open to prospects.");
     }
     // check if the rsvp already exists
     DataSet!PersonEvent ds;

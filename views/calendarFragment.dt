@@ -54,17 +54,20 @@
                     - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "INVALID LOCATION";
                     - auto locAddr = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].address : "";
                     - auto locMapsUrl = locAddr.length ? "https://www.google.com/maps/search/?api=1&query=" ~ encodeComponent(locAddr) : "";
-                    - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, att.attendanceRecorded));
-                    - auto declinedJson = ev.declined.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, false));
+                    - auto attsJson = ev.attendees.map!(att => attendeeJson(currentUser.prospect ? "" : model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, currentUser.prospect ? false : att.attendanceRecorded));
+                    - auto declinedJson = ev.declined.filter!(att => !currentUser.prospect).map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, false));
                     - auto calStudentCount = ev.attendees.map!(att => model.people[att.person_id].memberType).count(MemberType.student);
                     - auto calStudentsMaxed = ev.event.maxStudents > 0 && calStudentCount >= ev.event.maxStudents && currentUser.memberType == MemberType.student;
+                    - auto calNoProspects = currentUser.prospect && !ev.event.prospectsAllowed;
                     p(class="event-type-#{ev.event.type}")
                       - if (imGoing)
                         span.attending_check(title="You are attending") &check; 
                       - else if (iDeclined)
                         span.declined_mark(title="You have declined") &cross; 
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
-                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-i-declined=(iDeclined ? "true" : "false"), data-attendees=(attsJson), data-declined=(declinedJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults))
+                      - if (ev.event.prospectsAllowed)
+                        span.prospect-badge(title="Prospects allowed") P
+                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-i-declined=(iDeclined ? "true" : "false"), data-attendees=(attsJson), data-declined=(declinedJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-no-prospects=(calNoProspects ? "true" : "false"), data-hide-people=(currentUser.prospect ? "true" : "false"), data-prospects-allowed=(ev.event.prospectsAllowed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults))
                         svg.info-icon(viewBox="0 0 24 24", xmlns="http://www.w3.org/2000/svg", aria-hidden="true", focusable="false")
                           circle(cx="12", cy="5.3", r="2.0", fill="currentColor")
                           rect(x="10.2", y="9", width="3.6", height="9.4", fill="currentColor")
@@ -91,13 +94,14 @@
             - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
             - auto locAddr = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].address : "";
             - auto locMapsUrl = locAddr.length ? "https://www.google.com/maps/search/?api=1&query=" ~ encodeComponent(locAddr) : "";
-            - auto attsJson = ev.attendees.map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, att.attendanceRecorded));
+            - auto attsJson = ev.attendees.map!(att => attendeeJson(currentUser.prospect ? "" : model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, currentUser.prospect ? false : att.attendanceRecorded));
             - auto memberTypes = ev.attendees.map!(att => model.people[att.person_id].memberType);
             - auto studentCount = memberTypes.count(MemberType.student);
             - auto mentorCount = memberTypes.count(MemberType.mentor);
             - auto parentCount = memberTypes.count(MemberType.parent);
             - auto studentsSatisfied = studentCount >= ev.event.minStudents;
             - auto studentsMaxed = ev.event.maxStudents > 0 && studentCount >= ev.event.maxStudents && currentUser.memberType == MemberType.student;
+            - auto noProspects = currentUser.prospect && !ev.event.prospectsAllowed;
             - auto adultsSatisfied = mentorCount + parentCount >= ev.event.minAdults;
             - auto mentorsSatisfied = mentorCount >= 1;
             p(class="event-type-#{ev.event.type}")
@@ -106,6 +110,8 @@
               - else if (iDeclined)
                 span.declined_mark(title="You have declined") &cross; 
               | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
+              - if (ev.event.prospectsAllowed)
+                span.prospect-badge(title="Prospects allowed") P
             p.em-meta
               strong Type: 
               | #{ev.event.type}
@@ -131,6 +137,9 @@
             - if (ev.attendees.length == 0)
               p.em-meta
                 em No Attendees yet.
+            - else if (currentUser.prospect)
+              p.em-meta
+                em #{ev.attendees.length} attending
             - else
               div.em-attendees
                 h4 Attendees (#{ev.attendees.length})
@@ -145,7 +154,7 @@
                         em  (not seen yet)
                       - else if(d.get.date < today)
                         em  (absent)
-            - if (ev.declined.length > 0)
+            - if (ev.declined.length > 0 && !currentUser.prospect)
               div.em-declined
                 h4 Declined (#{ev.declined.length})
                 ul
@@ -165,7 +174,9 @@
                   | &nbsp;
                   a.em-button.em-withdraw(href="/rsvp?event_id=#{ev.event.id}&response=none&style=#{model.params.style}") Remove Response
                 - else
-                  - if (studentsMaxed)
+                  - if (noProspects)
+                    a.em-button.em-disabled(href="#") Not open to prospects
+                  - else if (studentsMaxed)
                     a.em-button.em-disabled(href="#") Full
                   - else
                     a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&response=attending&style=#{model.params.style}") RSVP

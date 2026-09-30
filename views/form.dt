@@ -52,10 +52,10 @@
     - else
       - static assert(false, "Unhandled field type: " ~ T.stringof);
 
-- void createForm(T, string prefix="")(T defaultVal = T.init, string[] exceptThese = [])
+- void createForm(T, string prefix="")(T defaultVal = T.init, string[] onlyThese = [])
   - static foreach(idx; 0 .. T.tupleof.length)
     - static if(!hasUDA!(T.tupleof[idx], autoIncrement) && !hasUDA!(T.tupleof[idx], noform))
-      - if(!exceptThese.canFind(__traits(identifier, T.tupleof[idx])))
+      - if(onlyThese.length == 0 || onlyThese.canFind(__traits(identifier, T.tupleof[idx])))
         - static if(isIntegral!(typeof(T.tupleof[idx])) && hasUDA!(T.tupleof[idx], dbenum))
           .form-group
             label #{getFieldLabel!(T.tupleof[idx])}

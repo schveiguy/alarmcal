@@ -13,6 +13,6 @@ block content
   form(method="POST", action="/invite?id=#{newUser.invitation_id}")
     section
       - import alarmcal.db;
-      - createForm(newUser, exceptThese: ["admin", "memberType", "email", "active"]);
+      - createForm(newUser, onlyThese: ["name", "password_hash"]);
     .form-group
       button(type="submit") Create user
