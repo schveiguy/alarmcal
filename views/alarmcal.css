@@ -469,11 +469,16 @@ span.low_count {
 }
 
 span.prospect-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.4em;
+  height: 1.4em;
   font-size: 0.7em;
   font-weight: bold;
   line-height: 1;
-  padding: 2px 5px;
+  padding: 0.15em 0 0;
   margin-left: 4px;
   border: 1px solid currentColor;
   border-radius: 50%;
