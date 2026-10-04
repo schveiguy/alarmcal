@@ -27,6 +27,8 @@ import iopipe.json.serialize : optional;
 
 enum ConfigFileName = "alarmcal_config.json5";
 
+enum GoogleMapsBaseUrl = "https://www.google.com/maps/search/?api=1&query=";
+
 mixin ServerinoLoop;
 
 SysTime getTime() {
@@ -204,6 +206,10 @@ struct EventInfo
     bool isSignedUp(int id) {
         import std.algorithm : canFind;
         return attendees.canFind!((ref PersonEvent pe, int id) => pe.person_id == id)(id);
+    }
+    bool hasDeclined(int id) {
+        import std.algorithm : canFind;
+        return declined.canFind!((ref PersonEvent pe, int id) => pe.person_id == id)(id);
     }
 }
 
@@ -514,6 +520,126 @@ struct IndexViewModel {
     Person[int] people;
     Location[int] locations;
     Nullable!CalendarDay[][][] cal;
+
+    struct EventAnalysis {
+        bool imGoing;
+        bool iDeclined;
+
+        int studentCount;
+        int mentorCount;
+        int parentCount;
+        int adultCount;
+        int attendeeCount;
+
+        bool studentsSatisfied;
+        bool studentsMaxxed;
+        bool adultsSatisfied;
+        bool mentorsSatisfied;
+
+        string locName;
+        string locAddr;
+        string locMapsUrl;
+    }
+
+    EventAnalysis eventAnalysis(ref EventInfo ev) {
+        import std.uri : encodeComponent;
+        auto loc = locations.get(ev.event.location_id, Location.init);
+        auto memberTypes = ev.attendees.map!(att => people[att.person_id].memberType);
+        auto retval = EventAnalysis(
+                imGoing: ev.isSignedUp(currentUser.id),
+                iDeclined: ev.hasDeclined(currentUser.id),
+                studentCount: cast(int)memberTypes.count(MemberType.student),
+                mentorCount: cast(int)memberTypes.count(MemberType.mentor),
+                parentCount: cast(int)memberTypes.count(MemberType.parent),
+                locName: loc.name,
+                locAddr: loc.address,
+                locMapsUrl: loc.address.length ? GoogleMapsBaseUrl ~ encodeComponent(loc.address) : ""
+        );
+        retval.adultCount = retval.mentorCount + retval.parentCount;
+        retval.attendeeCount = retval.adultCount + retval.studentCount;
+        retval.mentorsSatisfied = retval.mentorCount >= 1;
+        retval.studentsSatisfied = retval.studentCount >= ev.event.minStudents;
+        retval.studentsMaxxed = currentUser.memberType == MemberType.student && ev.event.minStudents > 0 && retval.studentCount >= ev.event.maxStudents;
+        retval.adultsSatisfied = retval.adultCount >= ev.event.minAdults;
+        return retval;
+    }
+
+    string eventJsonData(ref EventInfo ev) {
+        import iopipe.json;
+        import std.format : formattedWrite;
+
+        // serialize the event by customizing output designed to work with the web page.
+        static struct SerializerPolicy {
+            Person[int] people;
+
+            void serializeImpl(T, Writer)(ref Writer writer, ref T item) {
+                static if(is(T == DateTime)) {
+                    writer.beginString();
+                    formattedWrite((const char[] data) { writer.addStringData(data); },
+                            "%s %s", item.date.fullDatePrinter, item.timeOfDay.timePrinter);
+                    writer.endString();
+                }
+                else static if(is(T == TimeOfDay)) {
+                    writer.beginString();
+                    formattedWrite((const char[] data) { writer.addStringData(data); },
+                            "%s", item.timePrinter);
+                    writer.endString();
+                }
+                else static if(is(T == PersonEvent)) {
+                    // write as a json object with name, type, checkedIn
+                    static struct PersonView {
+                        string name;
+                        MemberType type;
+                        bool checkedIn;
+                    }
+                    auto p = people[item.person_id];
+                    auto pv = PersonView(
+                        name: p.name,
+                        type: p.memberType,
+                        checkedIn: item.attendanceRecorded
+                    );
+
+                    serializeImpl(writer, pv);
+                }
+                else iopipe.json.serialize.serializeImpl(this, writer, item);
+            }
+        }
+
+        static struct EventInfoView {
+            int id;
+            string title;
+            DateTime start;
+            TimeOfDay end;
+            EventType type;
+            int minStudents;
+            int maxStudents;
+            int minAdults;
+            bool prospectsAllowed;
+
+            EventAnalysis analysis;
+
+            PersonEvent[] attendees;
+            PersonEvent[] declined;
+        }
+
+        auto eiv = EventInfoView(
+                id: ev.event.id,
+                title: ev.event.title,
+                start: ev.event.start,
+                end: ev.event.end.timeOfDay,
+                minStudents: ev.event.minStudents,
+                maxStudents: ev.event.maxStudents,
+                minAdults: ev.event.minAdults,
+                prospectsAllowed: ev.event.prospectsAllowed,
+
+                analysis: eventAnalysis(ev),
+
+                attendees: currentUser.prospect ? [] : ev.attendees,
+                declined: currentUser.prospect ? [] : ev.declined,
+        );
+
+        return eiv.serialize(SerializerPolicy(people));
+    }
 }
 
 void messageRedirect(Output output, string result, string message)

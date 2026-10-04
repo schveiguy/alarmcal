@@ -49,25 +49,16 @@
               - else
                 td.day(class='#{d.get.date == today ? "today" : ""}')
                   - foreach(ev; d.get.events)
-                    - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
-                    - bool iDeclined = ev.declined.any!(att => att.person_id == currentUser.id);
-                    - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "INVALID LOCATION";
-                    - auto locAddr = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].address : "";
-                    - auto locMapsUrl = locAddr.length ? "https://www.google.com/maps/search/?api=1&query=" ~ encodeComponent(locAddr) : "";
-                    - auto attsJson = ev.attendees.map!(att => attendeeJson(currentUser.prospect ? "" : model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, currentUser.prospect ? false : att.attendanceRecorded));
-                    - auto declinedJson = ev.declined.filter!(att => !currentUser.prospect).map!(att => attendeeJson(model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, false));
-                    - auto calStudentCount = ev.attendees.map!(att => model.people[att.person_id].memberType).count(MemberType.student);
-                    - auto calStudentsMaxed = ev.event.maxStudents > 0 && calStudentCount >= ev.event.maxStudents && currentUser.memberType == MemberType.student;
-                    - auto calNoProspects = currentUser.prospect && !ev.event.prospectsAllowed;
+                    - auto analysis = model.eventAnalysis(ev);
                     p(class="event-type-#{ev.event.type}")
-                      - if (imGoing)
+                      - if (analysis.imGoing)
                         span.attending_check(title="You are attending") &check; 
-                      - else if (iDeclined)
+                      - else if (analysis.iDeclined)
                         span.declined_mark(title="You have declined") &cross; 
                       | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
                       - if (ev.event.prospectsAllowed)
                         span.prospect-badge(title="Prospects allowed") P
-                      button.event-btn(data-event-id=(ev.event.id), data-title=(ev.event.title), data-type=(ev.event.type), data-location=(locName), data-location-url=(locMapsUrl), data-start=(format("%s %s", ev.event.start.date.datePrinter, ev.event.start.timeOfDay.timePrinter)), data-end=(format("%s", ev.event.end.timeOfDay.timePrinter)), data-im-going=(imGoing ? "true" : "false"), data-i-declined=(iDeclined ? "true" : "false"), data-attendees=(attsJson), data-declined=(declinedJson), data-is-past=(d.get.date < today ? "true" : "false"), data-students-maxed=(calStudentsMaxed ? "true" : "false"), data-no-prospects=(calNoProspects ? "true" : "false"), data-hide-people=(currentUser.prospect ? "true" : "false"), data-prospects-allowed=(ev.event.prospectsAllowed ? "true" : "false"), data-min-students=(ev.event.minStudents), data-max-students=(ev.event.maxStudents), data-min-adults=(ev.event.minAdults))
+                      button.event-btn(data-event-info=(model.eventJsonData(ev)), data-is-past=(d.get.date < today ? "true" : "false"), data-hide-people=(currentUser.prospect == true ? "true" : "false"))
                         svg.info-icon(viewBox="0 0 24 24", xmlns="http://www.w3.org/2000/svg", aria-hidden="true", focusable="false")
                           circle(cx="12", cy="5.3", r="2.0", fill="currentColor")
                           rect(x="10.2", y="9", width="3.6", height="9.4", fill="currentColor")
@@ -89,25 +80,11 @@
             - if(d.get.date == today)
               |  (TODAY)
           - foreach(ev; d.get.events)
-            - bool imGoing = ev.attendees.any!(att => att.person_id == currentUser.id);
-            - bool iDeclined = ev.declined.any!(att => att.person_id == currentUser.id);
-            - auto locName = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].name : "";
-            - auto locAddr = (ev.event.location_id in model.locations) ? model.locations[ev.event.location_id].address : "";
-            - auto locMapsUrl = locAddr.length ? "https://www.google.com/maps/search/?api=1&query=" ~ encodeComponent(locAddr) : "";
-            - auto attsJson = ev.attendees.map!(att => attendeeJson(currentUser.prospect ? "" : model.people[att.person_id].name, model.people[att.person_id].memberType.to!string, currentUser.prospect ? false : att.attendanceRecorded));
-            - auto memberTypes = ev.attendees.map!(att => model.people[att.person_id].memberType);
-            - auto studentCount = memberTypes.count(MemberType.student);
-            - auto mentorCount = memberTypes.count(MemberType.mentor);
-            - auto parentCount = memberTypes.count(MemberType.parent);
-            - auto studentsSatisfied = studentCount >= ev.event.minStudents;
-            - auto studentsMaxed = ev.event.maxStudents > 0 && studentCount >= ev.event.maxStudents && currentUser.memberType == MemberType.student;
-            - auto noProspects = currentUser.prospect && !ev.event.prospectsAllowed;
-            - auto adultsSatisfied = mentorCount + parentCount >= ev.event.minAdults;
-            - auto mentorsSatisfied = mentorCount >= 1;
+            - auto analysis = model.eventAnalysis(ev);
             p(class="event-type-#{ev.event.type}")
-              - if (imGoing)
+              - if (analysis.imGoing)
                 span.attending_check(title="You are attending") &check; 
-              - else if (iDeclined)
+              - else if (analysis.iDeclined)
                 span.declined_mark(title="You have declined") &cross; 
               | #{ev.event.title} (#{ev.event.start.timeOfDay.timePrinter} - #{ev.event.end.timeOfDay.timePrinter})
               - if (ev.event.prospectsAllowed)
@@ -117,39 +94,39 @@
               | #{ev.event.type}
             p.em-meta
               strong Location:
-              - if (locMapsUrl.length)
-                a(href=(locMapsUrl), target="_blank", rel="noopener") #{locName}
+              - if (analysis.locMapsUrl.length)
+                a(href=(analysis.locMapsUrl), target="_blank", rel="noopener") #{analysis.locName}
               - else
-                | #{locName}
+                | #{analysis.locName}
             p.em-meta
               strong Student count: 
-              | #{memberTypes.count(MemberType.student)} (min 
-              span(class='#{studentsSatisfied ? "" : "low_count"}') #{ev.event.minStudents}
+              | #{analysis.studentCount} (min 
+              span(class='#{analysis.studentsSatisfied ? "" : "low_count"}') #{ev.event.minStudents}
               - if (ev.event.maxStudents > 0)
                 | , max #{ev.event.maxStudents}
               | )
             p.em-meta
               strong Adult count: 
-              span(class='#{mentorsSatisfied ? "" : "low_count"}') #{memberTypes.count(MemberType.mentor)}
-              |  mentors, #{memberTypes.count(MemberType.parent)} parents (min 
-              span(class='#{adultsSatisfied ? "" : "low_count"}') #{ev.event.minAdults}
+              span(class='#{analysis.mentorsSatisfied ? "" : "low_count"}') #{analysis.mentorCount}
+              |  mentors, #{analysis.parentCount} parents (min 
+              span(class='#{analysis.adultsSatisfied ? "" : "low_count"}') #{ev.event.minAdults}
               | )
-            - if (ev.attendees.length == 0)
+            - if (analysis.attendeeCount == 0)
               p.em-meta
                 em No Attendees yet.
             - else if (currentUser.prospect)
               p.em-meta
-                em #{ev.attendees.length} attending
+                em #{analysis.attendeeCount} attending
             - else
               div.em-attendees
-                h4 Attendees (#{ev.attendees.length})
+                h4 Attendees (#{analysis.attendeeCount})
                 ul
                   - foreach(att; ev.attendees)
                     - auto p = model.people[att.person_id];
                     li
                       | #{p.name} - #{p.memberType}
                       - if(att.attendanceRecorded)
-                        em  (checked in)
+                        em  &check;
                       - else if(d.get.date == today)
                         em  (not seen yet)
                       - else if(d.get.date < today)
@@ -163,23 +140,21 @@
                     li #{p.name} - #{p.memberType}
             div
               - if (d.get.date >= today)
-                - if (imGoing)
+                - if (analysis.imGoing)
                   em You are attending this event.&nbsp;
                   a.em-button.em-decline(href="/rsvp?event_id=#{ev.event.id}&response=declined&style=#{model.params.style}") Decline Instead
                   | &nbsp;
                   a.em-button.em-withdraw(href="/rsvp?event_id=#{ev.event.id}&response=none&style=#{model.params.style}") Remove Response
-                - else if (iDeclined)
+                - else if (analysis.iDeclined)
                   em You have declined this event.&nbsp;
                   a.em-button.em-attend(href="/rsvp?event_id=#{ev.event.id}&response=attending&style=#{model.params.style}") Attend Instead
                   | &nbsp;
                   a.em-button.em-withdraw(href="/rsvp?event_id=#{ev.event.id}&response=none&style=#{model.params.style}") Remove Response
                 - else
-                  - if (noProspects)
-                    a.em-button.em-disabled(href="#") Not open to prospects
-                  - else if (studentsMaxed)
+                  - if (analysis.studentsMaxxed)
                     a.em-button.em-disabled(href="#") Full
                   - else
-                    a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&response=attending&style=#{model.params.style}") RSVP
+                    a.em-button.em-rsvp(href="/rsvp?event_id=#{ev.event.id}&response=attending&style=#{model.params.style}") Attend
                   | &nbsp;
                   a.em-button.em-decline(href="/rsvp?event_id=#{ev.event.id}&response=declined&style=#{model.params.style}") Decline
               - if(currentUser.admin)
@@ -187,4 +162,3 @@
                 a.em-button.em-edit(href="/editEvent?id=#{ev.event.id}") Edit
                 | &nbsp;
                 a.em-button.em-delete(href="/deleteEvent?id=#{ev.event.id}") Delete
-

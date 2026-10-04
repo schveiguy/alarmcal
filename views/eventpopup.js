@@ -48,57 +48,37 @@ document.addEventListener('DOMContentLoaded', function () {
     return h + '</ul></div>';
   }
 
-  function countsHtml(list, minStudents, maxStudents, minAdults) {
-    var studentCount = list.filter(function(a) { return a.type === 'student'; }).length;
-    var mentorCount  = list.filter(function(a) { return a.type === 'mentor';  }).length;
-    var parentCount  = list.filter(function(a) { return a.type === 'parent';  }).length;
-    var studentsSatisfied = studentCount >= minStudents;
-    var adultsSatisfied   = (mentorCount + parentCount) >= minAdults;
-    var mentorsSatisfied  = mentorCount >= 1;
-    return '<p class="em-meta"><strong>Student count:</strong> ' + studentCount +
-      ' (min <span class="' + (studentsSatisfied ? '' : 'low_count') + '">' + minStudents + '</span>' +
-      (maxStudents > 0 ? ', max ' + maxStudents : '') + ')</p>' +
+  function countsHtml(d) {
+    return '<p class="em-meta"><strong>Student count:</strong> ' + d.analysis.studentCount +
+      ' (min <span class="' + (d.analysis.studentsSatisfied ? '' : 'low_count') + '">' + d.minStudents + '</span>' +
+      (d.maxStudents > 0 ? ', max ' + d.maxStudents : '') + ')</p>' +
       '<p class="em-meta"><strong>Adult count:</strong> ' +
-      '<span class="' + (mentorsSatisfied ? '' : 'low_count') + '">' + mentorCount + '</span>' +
-      ' mentors, ' + parentCount + ' parents (min <span class="' +
-      (adultsSatisfied ? '' : 'low_count') + '">' + minAdults + '</span>)</p>';
+      '<span class="' + (d.analysis.mentorsSatisfied ? '' : 'low_count') + '">' + d.analysis.mentorCount + '</span>' +
+      ' mentors, ' + d.analysis.parentCount + ' parents (min <span class="' +
+      (d.analysis.adultsSatisfied ? '' : 'low_count') + '">' + d.minAdults + '</span>)</p>';
   }
 
   /* ---------- Open modal ---------- */
   function openModal(btn, silent) {
-    var d = btn.dataset;
+    var d = JSON.parse(btn.getAttribute('data-event-info'));
     var isAdmin = document.body.dataset.admin === 'true';
-    var imGoing = d.imGoing === 'true';
-    var iDeclined = d.iDeclined === 'true';
-    var eid = encodeURIComponent(d.eventId);
+    var eid = encodeURIComponent(d.id);
 
-    var attendeeList = [];
-    try { attendeeList = JSON.parse(d.attendees || '[]'); } catch (e) {}
-    var declinedList = [];
-    try { declinedList = JSON.parse(d.declined || '[]'); } catch (e) {}
-    var minStudents = parseInt(d.minStudents, 10) || 0;
-    var maxStudents = parseInt(d.maxStudents, 10) || 0;
-    var minAdults   = parseInt(d.minAdults,   10) || 0;
-
-    var isPast = d.isPast === 'true';
-    var studentsMaxed = d.studentsMaxed === 'true';
-    var noProspects = d.noProspects === 'true';
-    var hidePeople = d.hidePeople === 'true';
+    var isPast = btn.getAttribute('data-is-past') === 'true';
+    var hidePeople = btn.getAttribute('data-hide-people') === 'true';
     var rsvpHtml = isPast
       ? ''
-      : imGoing
+      : d.analysis.imGoing
         ? '<em class="em-declined-note">You are attending this event.</em>' +
           '<a class="em-withdraw" href="/rsvp?event_id=' + eid + '&response=none">Remove Response</a>' +
           '<a class="em-decline" href="/rsvp?event_id=' + eid + '&response=declined">Decline Instead</a>'
-        : iDeclined
+        : d.analysis.iDeclined
           ? '<em class="em-declined-note">You have declined this event.</em>' +
             '<a class="em-attend" href="/rsvp?event_id=' + eid + '&response=attending">Attend Instead</a>' +
             '<a class="em-withdraw" href="/rsvp?event_id=' + eid + '&response=none">Remove Response</a>'
-          : (noProspects
-              ? '<a class="em-disabled" href="#">Not open to prospects</a>'
-              : studentsMaxed
+          : (d.analysis.studentsMaxed
               ? '<a class="em-disabled" href="#">Full</a>'
-              : '<a class="em-rsvp" href="/rsvp?event_id=' + eid + '&response=attending">RSVP</a>') +
+              : '<a class="em-rsvp" href="/rsvp?event_id=' + eid + '&response=attending">Attend</a>') +
             '<a class="em-decline" href="/rsvp?event_id=' + eid + '&response=declined">Decline</a>';
 
     var adminHtml = isAdmin
@@ -109,20 +89,20 @@ document.addEventListener('DOMContentLoaded', function () {
     modal.innerHTML =
       '<button class="em-close" aria-label="Close">&times;</button>' +
       '<h2 class="em-title">' + esc(d.title) +
-        (d.prospectsAllowed === 'true' ? ' <span class="prospect-badge" title="Prospects allowed">P</span>' : '') + '</h2>' +
+        (d.prospectsAllowed ? ' <span class="prospect-badge" title="Prospects allowed">P</span>' : '') + '</h2>' +
       '<p class="em-meta"><strong>Type:</strong> '     + esc(d.type)     + '</p>' +
-      (d.location ? '<p class="em-meta"><strong>Location:</strong> ' + (d.locationUrl ? '<a href="' + esc(d.locationUrl) + '" target="_blank" rel="noopener">' + esc(d.location) + '</a>' : esc(d.location)) + '</p>' : '') +
+      (d.analysis.locName ? '<p class="em-meta"><strong>Location:</strong> ' + (d.analysis.locMapsUrl ? '<a href="' + esc(d.analysis.locMapsUrl) + '" target="_blank" rel="noopener">' + esc(d.analysis.locName) + '</a>' : esc(d.analysis.locName)) + '</p>' : '') +
       '<p class="em-meta"><strong>Start:</strong> '   + esc(d.start)    + '</p>' +
       '<p class="em-meta"><strong>End:</strong> '     + esc(d.end)      + '</p>' +
-      countsHtml(attendeeList, minStudents, maxStudents, minAdults) +
+      countsHtml(d) +
       (hidePeople
-        ? '<p class="em-meta"><em>' + attendeeList.length + ' attending</em></p>'
-        : attendeesHtml(attendeeList) + declinedHtml(declinedList)) +
+        ? '<p class="em-meta"><em>' + d.analysis.attendeeCount + ' attending</em></p>'
+        : attendeesHtml(d.attendees) + declinedHtml(d.declined)) +
       '<div class="em-actions">' + rsvpHtml + adminHtml + '</div>';
 
     modal.querySelector('.em-close').addEventListener('click', close);
     overlay.classList.add('open');
-    openEventId = d.eventId;
+    openEventId = d.id;
     if (!silent) modal.querySelector('.em-close').focus();
   }
 

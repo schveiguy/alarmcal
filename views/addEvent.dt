@@ -10,11 +10,11 @@ block content
       - auto defaultTime = cast(DateTime)getTime();
       - defaultTime.second = 0;
       - createForm(Event(start: defaultTime, end: defaultTime));
-    section
       .form-group
         label
           input#repeat-checkbox(type="checkbox", name="repeat", value="true")
           |  Repeat event
+    section
       #repeat-options(style="display:none")
         .form-group
           label Repeat on days

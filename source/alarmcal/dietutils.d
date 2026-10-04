@@ -3,6 +3,7 @@ import std.datetime;
 import std.json : JSONValue;
 import std.array : appender;
 import diet.html;
+import alarmcal.db : Person;
 
 import serverino : Output;
 
@@ -75,12 +76,6 @@ auto timePrinter(TimeOfDay tod)
     return TP(tod);
 }
 
-/// Encode one attendee as a JSON object string for embedding in a data-attendees attribute.
-JSONValue attendeeJson(string name, string membertype, bool checkedIn)
-{
-    return JSONValue(["name": JSONValue(name), "type": JSONValue(membertype), "checkedIn": JSONValue(checkedIn)]);
-}
-
 TimeOfDay parseTime(string input)
 {
     // split on colons
@@ -108,4 +103,3 @@ void renderDiet(Args...)(ref Output output)
     output.addHeader("content-type", "text/html");
     output.write(renderDiet!Args());
 }
-
