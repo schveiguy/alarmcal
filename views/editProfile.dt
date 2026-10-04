@@ -5,6 +5,6 @@ block content
 
   form(method="POST", action="/performEditProfile")
     section
-      - createForm(currentUser, exceptThese: ["admin", "memberType", "active"]);
+      - createForm(currentUser, onlyThese: ["name", "email", "password_hash"]);
     .form-group
       button(type="submit") Submit

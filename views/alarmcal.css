@@ -467,3 +467,21 @@ span.low_count {
     font-size: .85rem;
   }
 }
+
+span.prospect-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1.4em;
+  height: 1.4em;
+  font-size: 0.7em;
+  font-weight: bold;
+  line-height: 1;
+  padding: 0.15em 0 0;
+  margin-left: 4px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: #555;
+  vertical-align: middle;
+}

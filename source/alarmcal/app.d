@@ -27,6 +27,8 @@ import iopipe.json.serialize : optional;
 
 enum ConfigFileName = "alarmcal_config.json5";
 
+enum GoogleMapsBaseUrl = "https://www.google.com/maps/search/?api=1&query=";
+
 mixin ServerinoLoop;
 
 SysTime getTime() {
@@ -131,13 +133,13 @@ string getPasswordHash(string input) {
     return generateBcrypt(input, rng, 10);
 }
 
-T extract(T, string prefix="")(Request.SafeAccess!string data, string[] exceptThese = []) {
+T extract(T, string prefix="")(Request.SafeAccess!string data, string[] onlyThese = []) {
     T result;
-    data.extract(result, exceptThese);
+    data.extract(result, onlyThese);
     return result;
 }
 
-void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, string[] exceptThese = []) {
+void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, string[] onlyThese = []) {
     import std.traits;
     import std.conv;
     import sqlbuilder.uda;
@@ -146,7 +148,7 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, 
 
     static foreach(idx; 0 .. T.tupleof.length) {
         static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)){
-            if(!exceptThese.canFind(__traits(identifier, T.tupleof[idx]))) {
+            if(onlyThese.length == 0 || onlyThese.canFind(__traits(identifier, T.tupleof[idx]))) {
                 alias FT = typeof(target.tupleof[idx]);
                 enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
                 static if(hasUDA!(target.tupleof[idx], form.password)) {
@@ -204,6 +206,10 @@ struct EventInfo
     bool isSignedUp(int id) {
         import std.algorithm : canFind;
         return attendees.canFind!((ref PersonEvent pe, int id) => pe.person_id == id)(id);
+    }
+    bool hasDeclined(int id) {
+        import std.algorithm : canFind;
+        return declined.canFind!((ref PersonEvent pe, int id) => pe.person_id == id)(id);
     }
 }
 
@@ -404,7 +410,7 @@ void handleInvitation(Request request, Output output) {
     else if(request.method == Request.Method.Post) {
         // clear the password
         newUser.password_hash = "";
-        request.post.extract(newUser, exceptThese: ["admin", "memberType", "email", "active"]);
+        request.post.extract(newUser, onlyThese: ["name", "password_hash"]);
         if(newUser.password_hash == "") {
             output.status = 400;
             return output.messageRedirect("Password required", "Password required for creating your account");
@@ -514,6 +520,126 @@ struct IndexViewModel {
     Person[int] people;
     Location[int] locations;
     Nullable!CalendarDay[][][] cal;
+
+    struct EventAnalysis {
+        bool imGoing;
+        bool iDeclined;
+
+        int studentCount;
+        int mentorCount;
+        int parentCount;
+        int adultCount;
+        int attendeeCount;
+
+        bool studentsSatisfied;
+        bool studentsMaxxed;
+        bool adultsSatisfied;
+        bool mentorsSatisfied;
+
+        string locName;
+        string locAddr;
+        string locMapsUrl;
+    }
+
+    EventAnalysis eventAnalysis(ref EventInfo ev) {
+        import std.uri : encodeComponent;
+        auto loc = locations.get(ev.event.location_id, Location.init);
+        auto memberTypes = ev.attendees.map!(att => people[att.person_id].memberType);
+        auto retval = EventAnalysis(
+                imGoing: ev.isSignedUp(currentUser.id),
+                iDeclined: ev.hasDeclined(currentUser.id),
+                studentCount: cast(int)memberTypes.count(MemberType.student),
+                mentorCount: cast(int)memberTypes.count(MemberType.mentor),
+                parentCount: cast(int)memberTypes.count(MemberType.parent),
+                locName: loc.name,
+                locAddr: loc.address,
+                locMapsUrl: loc.address.length ? GoogleMapsBaseUrl ~ encodeComponent(loc.address) : ""
+        );
+        retval.adultCount = retval.mentorCount + retval.parentCount;
+        retval.attendeeCount = retval.adultCount + retval.studentCount;
+        retval.mentorsSatisfied = retval.mentorCount >= 1;
+        retval.studentsSatisfied = retval.studentCount >= ev.event.minStudents;
+        retval.studentsMaxxed = currentUser.memberType == MemberType.student && ev.event.minStudents > 0 && retval.studentCount >= ev.event.maxStudents;
+        retval.adultsSatisfied = retval.adultCount >= ev.event.minAdults;
+        return retval;
+    }
+
+    string eventJsonData(ref EventInfo ev) {
+        import iopipe.json;
+        import std.format : formattedWrite;
+
+        // serialize the event by customizing output designed to work with the web page.
+        static struct SerializerPolicy {
+            Person[int] people;
+
+            void serializeImpl(T, Writer)(ref Writer writer, ref T item) {
+                static if(is(T == DateTime)) {
+                    writer.beginString();
+                    formattedWrite((const char[] data) { writer.addStringData(data); },
+                            "%s %s", item.date.fullDatePrinter, item.timeOfDay.timePrinter);
+                    writer.endString();
+                }
+                else static if(is(T == TimeOfDay)) {
+                    writer.beginString();
+                    formattedWrite((const char[] data) { writer.addStringData(data); },
+                            "%s", item.timePrinter);
+                    writer.endString();
+                }
+                else static if(is(T == PersonEvent)) {
+                    // write as a json object with name, type, checkedIn
+                    static struct PersonView {
+                        string name;
+                        MemberType type;
+                        bool checkedIn;
+                    }
+                    auto p = people[item.person_id];
+                    auto pv = PersonView(
+                        name: p.name,
+                        type: p.memberType,
+                        checkedIn: item.attendanceRecorded
+                    );
+
+                    serializeImpl(writer, pv);
+                }
+                else iopipe.json.serialize.serializeImpl(this, writer, item);
+            }
+        }
+
+        static struct EventInfoView {
+            int id;
+            string title;
+            DateTime start;
+            TimeOfDay end;
+            EventType type;
+            int minStudents;
+            int maxStudents;
+            int minAdults;
+            bool prospectsAllowed;
+
+            EventAnalysis analysis;
+
+            PersonEvent[] attendees;
+            PersonEvent[] declined;
+        }
+
+        auto eiv = EventInfoView(
+                id: ev.event.id,
+                title: ev.event.title,
+                start: ev.event.start,
+                end: ev.event.end.timeOfDay,
+                minStudents: ev.event.minStudents,
+                maxStudents: ev.event.maxStudents,
+                minAdults: ev.event.minAdults,
+                prospectsAllowed: ev.event.prospectsAllowed,
+
+                analysis: eventAnalysis(ev),
+
+                attendees: currentUser.prospect ? [] : ev.attendees,
+                declined: currentUser.prospect ? [] : ev.declined,
+        );
+
+        return eiv.serialize(SerializerPolicy(people));
+    }
 }
 
 void messageRedirect(Output output, string result, string message)
@@ -534,6 +660,9 @@ IndexViewModel buildIndexViewModel(Request request)
     Event[][Date] events;
     Date maxDate = minDate;
     auto query = select(ds).where(ds.start, " >= ", DateTime(minDate, TimeOfDay(0, 0, 0)).param);
+    // filter events for prospects
+    if(currentUser.prospect)
+        query = query.where(i"$(ds.prospectsAllowed) = 1");
     if (model.params.my_events) {
         query = query.where(i"$(ds.people.person_id) = $(currentUser.id) AND $(ds.people.attending) = 1");
     }
@@ -777,7 +906,7 @@ void editProfileForm(Request request, Output output) {
 void performEditProfile(Request request, Output output) {
     import std.conv : to;
     auto p = currentUser;
-    request.post.extract(p, exceptThese: ["admin", "memberType", "active"]);
+    request.post.extract(p, onlyThese: ["name", "email", "password_hash"]);
     auto pwChanged = currentUser.password_hash != p.password_hash;
     db.save(p);
     if(pwChanged) {
@@ -880,6 +1009,7 @@ void performEditEvent(Request request, Output output) {
                 ev.maxStudents = e.maxStudents;
                 ev.minStudents = e.minStudents;
                 ev.minAdults = e.minAdults;
+                ev.prospectsAllowed = e.prospectsAllowed;
                 ev.start = DateTime(ev.start.date, e.start.timeOfDay);
                 ev.end = ev.start + duration;
                 db.save(ev);
@@ -979,6 +1109,10 @@ void rsvp(Request request, Output output) {
     if(ev.id == -1) {
         output.status = 400;
         return output.messageRedirect("Invalid event", i"Invalid event id provided: $(p.event_id)".text);
+    }
+    if(currentUser.prospect && !ev.prospectsAllowed && p.response == RSVPResponse.attending) {
+        output.status = 403;
+        return output.messageRedirect("Not allowed", "This event is not open to prospects.");
     }
     // check if the rsvp already exists
     DataSet!PersonEvent ds;
