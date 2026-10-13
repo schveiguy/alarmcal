@@ -1,6 +1,5 @@
 module alarmcal.dietutils;
 import std.datetime;
-import std.json : JSONValue;
 import std.array : appender;
 import diet.html;
 import alarmcal.db : Person;

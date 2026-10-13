@@ -29,6 +29,12 @@ struct SendEmail {
     Email email;
 }
 
+struct SendSlack {
+    string channel; // channel ID, or user ID for a DM
+    string text;
+    string blocks; // optional Block Kit JSON array
+}
+
 Tid notificationTid;
 
 private ref const(NotificationConfig) config() {
@@ -49,6 +55,7 @@ void notificationThread() {
         receiveTimeout(sleepTime,
             (Shutdown s) { exiting = true; },
             (shared(SendEmail) sem) { handle(cast(SendEmail)sem); },
+            (SendSlack ss) { handle(ss); },
         );
         auto cur = MonoTime.currTime;
         auto elapsed = cur - lastPoke;
@@ -77,6 +84,30 @@ void dispatchEmail(Email email) {
 
 private void handle(SendEmail sem) {
     sendEmail(sem.email);
+}
+
+/**
+ * Send a Slack message to a channel ID, or to a user ID as a DM. Like
+ * dispatchEmail, the actual API call happens on the notification thread so
+ * request workers never block on Slack. Does nothing if Slack isn't configured.
+ */
+void dispatchSlack(string channel, string text, string blocks = null) {
+    import alarmcal.slack : slackEnabled;
+    if(!slackEnabled)
+        return;
+    if(notificationTid is Tid.init)
+        handle(SendSlack(channel, text, blocks));
+    else
+        notificationTid.send(SendSlack(channel, text, blocks));
+}
+
+private void handle(SendSlack ss) {
+    import alarmcal.slack : postMessage;
+    // a Slack failure must never kill the notification thread
+    try
+        postMessage(ss.channel, ss.text, ss.blocks);
+    catch(Exception e)
+        errorf("Could not send Slack message to %s: %s", ss.channel, e.msg);
 }
 
 private void poke() {

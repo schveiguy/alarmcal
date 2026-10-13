@@ -6,6 +6,7 @@ import alarmcal.session;
 import alarmcal.mail;
 import alarmcal.dietutils;
 import alarmcal.notifications;
+import alarmcal.slack : SlackConfig;
 import form = alarmcal.formudas;
 
 import std.array;
@@ -53,10 +54,33 @@ int cliAddUser(string[] args) {
     return 0;
 }
 
+// Verify Slack connectivity. With a target, also sends a test message:
+//   user@example.com -> DM to that person (looked up by email)
+//   #name            -> that channel (looked up by name)
+//   anything else    -> used as a Slack channel/user ID as-is
+int cliSlackTest(string[] args) {
+    import alarmcal.slack;
+    import std.stdio;
+    enforce(args.length <= 1, "usage: cli slackTest [email|#channel|id]");
+    enforce(slackEnabled, "No slack.botToken in " ~ ConfigFileName);
+    auto auth = authTest();
+    writeln(i"Authenticated as '$(auth.user)' in workspace '$(auth.team)'");
+    if(args.length == 1) {
+        string target = args[0];
+        if(target.canFind('@'))
+            target = lookupUserByEmail(target);
+        else if(target.startsWith('#'))
+            target = resolveChannel(target);
+        postMessage(target, "Hello from alarmcal! Slack connectivity is working.");
+        writeln(i"Posted test message to $(target)");
+    }
+    return 0;
+}
 
 struct Config {
     EmailConfig email;
     @optional NotificationConfig notifications;
+    @optional SlackConfig slack;
     @optional string timeZone = "US/Eastern";
     @optional string host = "https://alarmcal.info";
 }
@@ -95,6 +119,8 @@ int main(string[] args)
         switch(args[2]) {
             case "addUser":
                 return cliAddUser(args[3 .. $]);
+            case "slackTest":
+                return cliSlackTest(args[3 .. $]);
             default:
                 throw new Exception("Unknown cli command: " ~ args[2]);
         }
