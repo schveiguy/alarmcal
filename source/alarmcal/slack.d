@@ -10,7 +10,7 @@ import std.uni : icmp;
 import core.thread : Thread;
 import core.time;
 
-import iopipe.json.serialize : deserialize, optional, extras, JSONIopipeException;
+import iopipe.json.serialize : deserialize, optional, extras, JSONIopipeException, ignoreExtras;
 import iopipe.json.dom : JSONValue;
 
 import alarmcal.json;
@@ -86,10 +86,9 @@ T slackCall(T = SlackResponse)(string method, string[string] params = null) {
     assert(0); // the last attempt always returns or throws
 }
 
+@ignoreExtras
 struct AuthTestResult {
     bool ok;
-    // Slack adds fields over time, so absorb any we don't list.
-    @extras JSONValue!string _extra;
 
     @optional:
     string error;
@@ -132,15 +131,35 @@ string openDM(string userId) {
 private string[string] channelCache;
 
 /// Resolve a channel name (with or without a leading '#') to its ID.
-/// Needs the channels:read scope (and groups:read for private channels).
+/// Needs the channels:read scope; private channels also need groups:read, and
+/// are skipped if that scope is missing.
 string resolveChannel(string name) {
     name = name.chompPrefix("#");
     if(auto id = name in channelCache)
         return *id;
+    // Query each type separately: asking for private_channel without
+    // groups:read fails the whole call, even if the channel is public.
+    foreach(type; ["public_channel", "private_channel"]) {
+        try {
+            if(auto id = findChannel(type, name))
+                return id;
+        }
+        catch(SlackException e) {
+            if(type == "private_channel" && e.slackError == "missing_scope")
+                continue;
+            throw e;
+        }
+    }
+    throw new SlackException("conversations.list", "channel_not_found: " ~ name);
+}
+
+// Page through channels of one type, caching them all. Returns the ID of
+// `name`, or null if it isn't of this type.
+private string findChannel(string type, string name) {
     string cursor;
     do {
         string[string] params = [
-            "types": "public_channel,private_channel",
+            "types": type,
             "exclude_archived": "true",
             "limit": "200",
         ];
@@ -156,5 +175,5 @@ string resolveChannel(string name) {
             if(auto nc = "next_cursor" in *md)
                 cursor = nc.str;
     } while(cursor.length);
-    throw new SlackException("conversations.list", "channel_not_found: " ~ name);
+    return null;
 }
