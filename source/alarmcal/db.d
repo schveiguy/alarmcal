@@ -13,6 +13,7 @@ import std.logger;
 import std.format;
 static import std.file;
 import std.typecons;
+import std.exception;
 
 import d2sqlite3;
 
@@ -279,6 +280,15 @@ void applyMigrations()
     db.close();
     auto appliedDate = cast(DateTime)getTime();
     string backupDBName = format("migration_backup_%s_%s", appliedDate.toISOString, databaseName);
+    if(std.file.exists(backupDBName)) {
+        // wait 5 seconds, then attempt another db name.
+        info("Migration collision, pausing for 5 seconds to avoid overwriting prior backup!");
+        import core.thread, core.time;
+        Thread.sleep(5.seconds);
+        appliedDate = cast(DateTime)getTime();
+        backupDBName = format("migration_backup_%s_%s", appliedDate.toISOString, databaseName);
+        enforce(!std.file.exists(backupDBName), "Migration file still colliding, exiting to avoid overwriting prior backup!");
+    }
     std.file.copy(databaseName, backupDBName);
     db = Database(databaseName);
     scope(failure)
