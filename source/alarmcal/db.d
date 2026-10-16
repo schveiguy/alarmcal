@@ -62,7 +62,7 @@ struct Person
     @noform Nullable!string reset_password_id;
     @noform Nullable!DateTime reset_password_time;
     string name;
-    string email;
+    @unique @colType("TEXT COLLATE NOCASE") string email;
     @password @label("Password") string password_hash;
     bool admin;
     bool active = true;
@@ -238,6 +238,7 @@ void applyMigrations()
         addPersonActive(),
         addPersonProspect(),
         addEventProspectsAllowed(),
+        makePersonEmailCaseInsensitive(),
     ];
 
     auto db = openDB();
@@ -381,5 +382,37 @@ Migration addEventProspectsAllowed() {
     Migration result;
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE Event ADD COLUMN prospectsAllowed INTEGER NOT NULL DEFAULT 0`);
+    return result;
+}
+
+Migration makePersonEmailCaseInsensitive() {
+    // SQLite cannot alter a column's collation in place, so rebuild the table.
+    // The new table is created under a temporary name and renamed after the old
+    // one is dropped, so the foreign keys in PersonEvent and Session (which
+    // refer to "Person" by name) are left untouched.
+    Migration result;
+    result.name = __FUNCTION__;
+
+    struct Person_new
+    {
+        @primaryKey @autoIncrement int id;
+        MemberType memberType;
+        Nullable!string invitation_id;
+        Nullable!string reset_password_id;
+        Nullable!DateTime reset_password_time;
+        string name;
+        @unique @colType("TEXT COLLATE NOCASE") string email;
+        string password_hash;
+        bool admin;
+        bool active;
+        bool prospect; // has not yet joined the team; limited to prospect-friendly events, and cannot see other attendees
+
+        static @mapping("person_id") @refersTo!PersonEvent Relation events;
+    }
+
+    result.add(createTableSql!(Person_new, true));
+    result.add(`INSERT INTO "Person_new" (id, memberType, name, email, password_hash, admin, invitation_id, reset_password_id, reset_password_time, active, prospect) SELECT id, memberType, name, email, password_hash, admin, invitation_id, reset_password_id, reset_password_time, active, prospect FROM "Person"`);
+    result.add(`DROP TABLE "Person"`);
+    result.add(`ALTER TABLE "Person_new" RENAME TO "Person"`);
     return result;
 }
