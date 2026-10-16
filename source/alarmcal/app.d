@@ -190,6 +190,74 @@ void extract(string prefix="", T)(Request.SafeAccess!string data, ref T target, 
     }
 }
 
+// Like extract, but for bulk edits: a blank value (or "null" for enum-like fields, or for the
+// tri-state booleans) means "leave this field alone". Applies to a single item; the caller
+// decides which items to process.
+void extractBulk(string prefix="", T)(Request.SafeAccess!string data, ref T target, string[] onlyThese = []) {
+    import std.traits;
+    import std.conv;
+    import sqlbuilder.uda;
+    import std.string : strip;
+
+    static foreach(idx; 0 .. T.tupleof.length) {
+        static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)) {
+            if(onlyThese.length == 0 || onlyThese.canFind(__traits(identifier, T.tupleof[idx]))) {
+                alias FT = typeof(target.tupleof[idx]);
+                enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
+                static if(hasUDA!(target.tupleof[idx], form.password)) {
+                    auto pw = data.read(formname);
+                    if(pw.strip.length > 0)
+                        target.tupleof[idx] = getPasswordHash(pw).to!FT;
+                }
+                else static if(is(FT == DateTime)) {
+                    static if(hasUDA!(target.tupleof[idx], form.timeOnly)) {
+                        auto t = data.read(formname);
+                        if(t.length > 0)
+                            target.tupleof[idx] = DateTime(target.tupleof[idx].date, parseTime(t));
+                    } else {
+                        // date and time may be independently "various"
+                        auto d = data.read(formname ~ "_d");
+                        auto t = data.read(formname ~ "_t");
+                        auto date = target.tupleof[idx].date;
+                        auto tod = target.tupleof[idx].timeOfDay;
+                        if(d.length > 0)
+                            date = Date.fromISOExtString(d);
+                        if(t.length > 0)
+                            tod = parseTime(t);
+                        target.tupleof[idx] = DateTime(date, tod);
+                    }
+                }
+                else static if(is(FT == Date)) {
+                    auto d = data.read(formname);
+                    if(d.length > 0)
+                        target.tupleof[idx] = Date.fromISOExtString(d);
+                }
+                else static if(is(FT == bool)) {
+                    // "true"/"false" to set, anything else ("null" or absent) to leave alone
+                    auto b = data.read(formname, "null");
+                    if(b == "true" || b == "false")
+                        target.tupleof[idx] = b.to!bool;
+                }
+                else {
+                    string val = data.read(formname);
+                    static if(is(FT == enum) || hasUDA!(target.tupleof[idx], form.dbenum)) {
+                        if(val == "null")
+                            val = "";
+                    }
+                    if(val.length > 0)
+                        target.tupleof[idx] = val.to!FT;
+                }
+            }
+        }
+    }
+}
+
+// The ids of the items selected for a bulk edit.
+int[] bulkIds(Request request) {
+    import std.conv : to;
+    return request.post.readAll("id").map!(to!int).array;
+}
+
 Event extractEvent(string prefix="")(Request.SafeAccess!string data) {
     auto event = extract!(Event, prefix)(data);
     // fix end event date to match start date
@@ -896,6 +964,51 @@ void performEditPerson(Request request, Output output) {
 }
 
 @endpoint
+@postRoute!"/bulkEditPerson"
+void bulkEditPersonForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit people");
+    }
+    auto ids = request.bulkIds;
+    if(ids.length == 0) {
+        output.status = 400;
+        return output.messageRedirect("Nothing selected", "Select at least one item to edit");
+    }
+    Person[] items = ids.map!(id => db.fetchUsingKey!Person(id)).array;
+    output.renderDiet!("bulkEditPerson.dt", currentUser, items);
+}
+
+@endpoint
+@postRoute!"/performBulkEditPerson"
+void performBulkEditPerson(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit people");
+    }
+    auto ids = request.bulkIds;
+    if(ids.length == 0) {
+        output.status = 400;
+        return output.messageRedirect("Nothing selected", "Select at least one item to edit");
+    }
+    db.begin();
+    scope(failure) db.rollback();
+    foreach(id; ids) {
+        auto p = db.fetchUsingKey!Person(id);
+        auto origPW = p.password_hash;
+        request.post.extractBulk(p);
+        db.save(p);
+        if(origPW != p.password_hash) {
+            endAllSessions(db, p.id);
+            infof("Password changed for person id:%s '%s' by %s, all sessions invalidated", p.id, p.name, currentUser.name);
+        }
+        infof("Bulk updated person id:%s '%s' type=%s email=%s admin=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.active, currentUser.name);
+    }
+    db.commit();
+    output.redirect("/persons");
+}
+
+@endpoint
 @getRoute!"/editProfile"
 void editProfileForm(Request request, Output output) {
     output.renderDiet!("editProfile.dt", currentUser);
@@ -955,6 +1068,46 @@ void performEditLocation(Request request, Output output) {
     l.id = request.post.read("id").to!int;
     db.save(l);
     infof("Updated location id:%s '%s' at '%s' by %s", l.id, l.name, l.address, currentUser.name);
+    output.redirect("/locations");
+}
+
+@endpoint
+@postRoute!"/bulkEditLocation"
+void bulkEditLocationForm(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit locations");
+    }
+    auto ids = request.bulkIds;
+    if(ids.length == 0) {
+        output.status = 400;
+        return output.messageRedirect("Nothing selected", "Select at least one item to edit");
+    }
+    Location[] items = ids.map!(id => db.fetchUsingKey!Location(id)).array;
+    output.renderDiet!("bulkEditLocation.dt", currentUser, items);
+}
+
+@endpoint
+@postRoute!"/performBulkEditLocation"
+void performBulkEditLocation(Request request, Output output) {
+    if(!currentUser.admin) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only administrators can edit locations");
+    }
+    auto ids = request.bulkIds;
+    if(ids.length == 0) {
+        output.status = 400;
+        return output.messageRedirect("Nothing selected", "Select at least one item to edit");
+    }
+    db.begin();
+    scope(failure) db.rollback();
+    foreach(id; ids) {
+        auto l = db.fetchUsingKey!Location(id);
+        request.post.extractBulk(l);
+        db.save(l);
+        infof("Bulk updated location id:%s '%s' at '%s' by %s", l.id, l.name, l.address, currentUser.name);
+    }
+    db.commit();
     output.redirect("/locations");
 }
 

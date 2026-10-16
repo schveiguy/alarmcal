@@ -5,25 +5,66 @@
 - import std.conv;
 - import std.datetime;
 
-- void tableView(T)(T[] items, string editRoute)
-  div.table-wrap
-    table.item-table
-      thead
-        tr
-          - static foreach(idx; 0 .. T.tupleof.length)
-            - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
-              th #{getFieldLabel!(T.tupleof[idx])}
-          th
-      tbody
-        - foreach(item; items)
+- void tableView(T)(T[] items, string editRoute, string bulkRoute)
+  form#bulk-form(method="POST", action=bulkRoute)
+    .bulk-toolbar
+      button#bulk-start(type="button") Bulk Edit
+      button#bulk-submit(type="submit", hidden, disabled) Edit Selected
+      button#bulk-cancel(type="button", hidden) Cancel
+    div.table-wrap
+      table.item-table
+        thead
           tr
+            th.bulk-col(hidden)
+              input#bulk-all(type="checkbox", title="Select all")
             - static foreach(idx; 0 .. T.tupleof.length)
               - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
-                - static if(is(typeof(T.tupleof[idx]) == bool))
-                  td #{item.tupleof[idx] ? "Yes" : "No"}
-                - else static if(is(typeof(T.tupleof[idx]) == DateTime))
-                  td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
-                - else
-                  td #{item.tupleof[idx]}
-            td
-              a.em-button.em-edit(href="#{editRoute}?id=#{item.id}") Edit
+                th #{getFieldLabel!(T.tupleof[idx])}
+            th
+        tbody
+          - foreach(item; items)
+            tr
+              td.bulk-col(hidden)
+                input.bulk-select(type="checkbox", name="id", value=(item.id))
+              - static foreach(idx; 0 .. T.tupleof.length)
+                - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
+                  - static if(is(typeof(T.tupleof[idx]) == bool))
+                    td #{item.tupleof[idx] ? "Yes" : "No"}
+                  - else static if(is(typeof(T.tupleof[idx]) == DateTime))
+                    td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
+                  - else
+                    td #{item.tupleof[idx]}
+              td
+                a.em-button.em-edit(href="#{editRoute}?id=#{item.id}") Edit
+    script.
+      (function () {
+        var form = document.getElementById('bulk-form');
+        var start = document.getElementById('bulk-start');
+        var submit = document.getElementById('bulk-submit');
+        var cancel = document.getElementById('bulk-cancel');
+        var all = document.getElementById('bulk-all');
+        var boxes = Array.prototype.slice.call(form.querySelectorAll('input.bulk-select'));
+        function setBulk(on) {
+          form.querySelectorAll('.bulk-col').forEach(function (e) { e.hidden = !on; });
+          start.hidden = on;
+          submit.hidden = !on;
+          cancel.hidden = !on;
+          if (!on) {
+            boxes.forEach(function (b) { b.checked = false; });
+          }
+          refresh();
+        }
+        function refresh() {
+          var n = boxes.filter(function (b) { return b.checked; }).length;
+          all.checked = n > 0 && n == boxes.length;
+          all.indeterminate = n > 0 && n < boxes.length;
+          submit.disabled = n == 0;
+        }
+        start.addEventListener('click', function () { setBulk(true); });
+        cancel.addEventListener('click', function () { setBulk(false); });
+        all.addEventListener('change', function () {
+          boxes.forEach(function (b) { b.checked = all.checked; });
+          refresh();
+        });
+        boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+      })();
