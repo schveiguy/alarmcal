@@ -4,7 +4,6 @@
 - import std.traits;
 - import std.datetime;
 - import std.algorithm : canFind;
-- import std.conv : to;
 - void formFieldNum(T)(string name, string prefix, T defaultVal)
   input(type="number", value=defaultVal, name="#{prefix}#{name}")
 
