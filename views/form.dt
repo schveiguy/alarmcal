@@ -75,22 +75,25 @@
 
 //- Bulk editing: fields whose values differ among the items are left blank (or "various").
 
-- bool allSame(T, F)(T[] items, scope F get)
-  - foreach(i; items[1 .. $])
-    - if(get(i) != get(items[0]))
+- bool allSame(size_t idx, T)(T[] items)
+  - foreach(ref i; items[1 .. $])
+    - if(i.tupleof[idx] != items[0].tupleof[idx])
       - return false;
   - return true;
 
 - enum variousText = "Various, enter a value to set";
 
 - void bulkFieldNum(T)(string name, string prefix, bool same, T val)
-  input(type="number", value=(same ? val.to!string : ""), placeholder=(same ? "" : variousText), name="#{prefix}#{name}")
+  - if(same)
+    input(type="number", value=(val), name="#{prefix}#{name}")
+  - else
+    input(type="number", placeholder=(variousText), name="#{prefix}#{name}")
 
 - void bulkFieldString(string name, string prefix, bool same, string val)
-  input(type="text", value=(same ? val : ""), placeholder=(same ? "" : variousText), name="#{prefix}#{name}")
-
-- void bulkFieldPassword(string name, string prefix)
-  input(type="password", name="#{prefix}#{name}", placeholder="Leave blank to keep existing passwords")
+  - if(same)
+    input(type="text", value=(val), name="#{prefix}#{name}")
+  - else
+    input(type="text", placeholder=(variousText), name="#{prefix}#{name}")
 
 - void bulkFieldEnum(T)(string name, string prefix, bool same, T val)
   select(name="#{prefix}#{name}")
@@ -106,16 +109,22 @@
     - foreach(v; options)
       option(value=(v.id), selected=(same && val == v.id)) #{v.name}
 
-- void bulkFieldDateTime(string name, string prefix, bool sameDate, bool sameTime, DateTime val)
+- void bulkFieldDateTime(string name, string prefix, bool same, DateTime val)
   fieldset.datetime-group
-    input(type="date", value=(sameDate ? val.date.datePrinter.to!string : ""), title=(sameDate ? "" : variousText), name="#{prefix}#{name}_d")
-    input(type="time", value=(sameTime ? val.timeOfDay.to!string : ""), title=(sameTime ? "" : variousText), name="#{prefix}#{name}_t")
-    - if(!sameDate || !sameTime)
+    - if(same)
+      input(type="date", value=(val.date.datePrinter), name="#{prefix}#{name}_d")
+      input(type="time", value=(val.timeOfDay), name="#{prefix}#{name}_t")
+    - else
+      input(type="date", title=(variousText), name="#{prefix}#{name}_d")
+      input(type="time", title=(variousText), name="#{prefix}#{name}_t")
+    - if(!same)
       small.various-hint #{variousText}
 
 - void bulkFieldTimeOfDay(string name, string prefix, bool same, TimeOfDay val)
-  input(type="time", value=(same ? val.to!string : ""), title=(same ? "" : variousText), name="#{prefix}#{name}")
-  - if(!same)
+  - if(same)
+    input(type="time", value=(val), name="#{prefix}#{name}")
+  - else
+    input(type="time", title=(variousText), name="#{prefix}#{name}")
     small.various-hint #{variousText}
 
 //- Tri-state boolean. The hidden input carries the submitted value: "null" (leave alone) until the
@@ -136,46 +145,50 @@
       });
     });
 
+- void bulkFormField(T)(string name, string prefix, bool same, T defaultVal, string labelText)
+  div.form-group
+    label #{labelText}
+    - static if(is(T == enum))
+      - bulkFieldEnum(name, prefix, same, defaultVal);
+    - else static if(isNumeric!T)
+      - bulkFieldNum(name, prefix, same, defaultVal);
+    - else static if(is(T == string))
+      - bulkFieldString(name, prefix, same, defaultVal);
+    - else static if(is(T == DateTime))
+      - bulkFieldDateTime(name, prefix, same, defaultVal);
+    - else static if(is(T == TimeOfDay))
+      - bulkFieldTimeOfDay(name, prefix, same, defaultVal);
+    - else
+      - static assert(false, "Unhandled field type: " ~ T.stringof);
+
 - void createBulkForm(T, string prefix="")(T[] items, string[] onlyThese = [])
   - import std.conv : to;
+  - size_t nBools = 0;
   - static foreach(idx; 0 .. T.tupleof.length)
-    - static if(!hasUDA!(T.tupleof[idx], autoIncrement) && !hasUDA!(T.tupleof[idx], noform))
+    - static if(!hasUDA!(T.tupleof[idx], autoIncrement) && !hasUDA!(T.tupleof[idx], noform) && !hasUDA!(T.tupleof[idx], password))
       - if(onlyThese.length == 0 || onlyThese.canFind(__traits(identifier, T.tupleof[idx])))
         - alias FT = typeof(T.tupleof[idx]);
         - enum fname = __traits(identifier, T.tupleof[idx]);
         - enum flabel = getFieldLabel!(T.tupleof[idx]);
-        - auto same = allSame(items, (T i) => i.tupleof[idx]);
+        - auto same = allSame!idx(items);
         - static if(isIntegral!FT && hasUDA!(T.tupleof[idx], dbenum))
           .form-group
             label #{flabel}
             - bulkFieldDBEnum(fname, prefix, getDBEnumValues!(getUDAs!(T.tupleof[idx], dbenum)[0].Type), same, items[0].tupleof[idx]);
-        - else static if(isSomeString!FT && hasUDA!(T.tupleof[idx], password))
-          .form-group
-            label #{flabel}
-            - bulkFieldPassword(fname, prefix);
         - else static if(is(FT == bool))
+          - ++nBools;
           .form-group
             - bulkFieldBool(fname, prefix, same, items[0].tupleof[idx], flabel);
         - else static if(is(FT == DateTime) && hasUDA!(T.tupleof[idx], timeOnly))
-          .form-group
-            label #{flabel}
-            - bulkFieldTimeOfDay(fname, prefix, allSame(items, (T i) => i.tupleof[idx].timeOfDay), items[0].tupleof[idx].timeOfDay);
-        - else static if(is(FT == DateTime))
-          .form-group
-            label #{flabel}
-            - bulkFieldDateTime(fname, prefix, allSame(items, (T i) => i.tupleof[idx].date), allSame(items, (T i) => i.tupleof[idx].timeOfDay), items[0].tupleof[idx]);
-        - else static if(is(FT == enum))
-          .form-group
-            label #{flabel}
-            - bulkFieldEnum(fname, prefix, same, items[0].tupleof[idx]);
-        - else static if(isNumeric!FT)
-          .form-group
-            label #{flabel}
-            - bulkFieldNum(fname, prefix, same, items[0].tupleof[idx]);
-        - else static if(is(FT == string))
-          .form-group
-            label #{flabel}
-            - bulkFieldString(fname, prefix, same, items[0].tupleof[idx]);
+          - bulkFormField(fname, prefix, same, items[0].tupleof[idx].timeOfDay, flabel);
         - else
-          - static assert(false, "Unhandled field type: " ~ FT.stringof);
-  - bulkFormScript();
+          - bulkFormField(fname, prefix, same, items[0].tupleof[idx], flabel);
+  - if(nBools)
+    script.
+      document.querySelectorAll('input.bulk-bool').forEach(function (c) {
+        if (c.dataset.mixed == 'true') c.indeterminate = true;
+        c.addEventListener('change', function () {
+          c.indeterminate = false;
+          c.nextElementSibling.value = c.checked ? 'true' : 'false';
+        });
+      });

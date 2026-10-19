@@ -200,16 +200,12 @@ void extractBulk(string prefix="", T)(Request.SafeAccess!string data, ref T targ
     import std.string : strip;
 
     static foreach(idx; 0 .. T.tupleof.length) {
-        static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform)) {
+        static if(!hasUDA!(target.tupleof[idx], autoIncrement) && !hasUDA!(target.tupleof[idx], form.noform) &&
+                !hasUDA!(target.tupleof[idx], form.password)) {
             if(onlyThese.length == 0 || onlyThese.canFind(__traits(identifier, T.tupleof[idx]))) {
                 alias FT = typeof(target.tupleof[idx]);
                 enum formname = prefix ~ __traits(identifier, T.tupleof[idx]);
-                static if(hasUDA!(target.tupleof[idx], form.password)) {
-                    auto pw = data.read(formname);
-                    if(pw.strip.length > 0)
-                        target.tupleof[idx] = getPasswordHash(pw).to!FT;
-                }
-                else static if(is(FT == DateTime)) {
+                static if(is(FT == DateTime)) {
                     static if(hasUDA!(target.tupleof[idx], form.timeOnly)) {
                         auto t = data.read(formname);
                         if(t.length > 0)
@@ -954,7 +950,7 @@ void performEditPerson(Request request, Output output) {
         endAllSessions(db, p.id);
         infof("Password changed for person id:%s '%s' by %s, all sessions invalidated", p.id, p.name, currentUser.name);
     }
-    infof("Updated person id:%s '%s' type=%s email=%s admin=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.active, currentUser.name);
+    infof("Updated person id:%s '%s' type=%s email=%s admin=%s prospect=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.prospect, p.active, currentUser.name);
 
     if(resend_invitation) {
         infof("Email invitation sent to %s", p.email);
@@ -998,11 +994,7 @@ void performBulkEditPerson(Request request, Output output) {
         auto origPW = p.password_hash;
         request.post.extractBulk(p);
         db.save(p);
-        if(origPW != p.password_hash) {
-            endAllSessions(db, p.id);
-            infof("Password changed for person id:%s '%s' by %s, all sessions invalidated", p.id, p.name, currentUser.name);
-        }
-        infof("Bulk updated person id:%s '%s' type=%s email=%s admin=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.active, currentUser.name);
+        infof("Bulk updated person id:%s '%s' type=%s email=%s admin=%s prospect=%s active=%s by %s", p.id, p.name, p.memberType, p.email, p.admin, p.prospect, p.active, currentUser.name);
     }
     db.commit();
     output.redirect("/persons");
