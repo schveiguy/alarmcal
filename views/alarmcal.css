@@ -485,3 +485,20 @@ span.prospect-badge {
   color: #555;
   vertical-align: middle;
 }
+
+[hidden] {
+  display: none !important;
+}
+
+.bulk-toolbar {
+  margin: 0.5em 0;
+}
+
+.bulk-toolbar button {
+  margin-right: 0.5em;
+}
+
+.various-hint {
+  display: block;
+  color: #666;
+}

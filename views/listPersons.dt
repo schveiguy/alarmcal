@@ -4,4 +4,4 @@ block content
   h1 Persons
 
   - import alarmcal.db;
-  - tableView!Person(persons, "/editPerson");
+  - tableView!Person(persons, "/editPerson", "/bulkEditPerson");

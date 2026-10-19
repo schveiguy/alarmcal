@@ -1,0 +1,16 @@
+extends layout
+block content
+  include form
+  - import std.algorithm : map, joiner;
+  h1 Bulk Edit Persons
+
+  p Editing #{items.length} persons: #{items.map!(i => i.name).joiner(", ")}
+  p Fields that differ are blank. Leave a field blank (or "(various)") to keep each item's current value.
+
+  form(method="POST", action="/performBulkEditPerson")
+    - foreach(item; items)
+      input(type="hidden", name="id", value=(item.id))
+    section
+      - createBulkForm(items);
+    .form-group
+      button(type="submit") Submit

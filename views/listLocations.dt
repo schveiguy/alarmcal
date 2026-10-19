@@ -4,4 +4,4 @@ block content
   h1 Locations
 
   - import alarmcal.db;
-  - tableView!Location(locations, "/editLocation");
+  - tableView!Location(locations, "/editLocation", "/bulkEditLocation");
