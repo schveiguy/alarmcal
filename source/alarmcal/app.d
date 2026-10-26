@@ -691,6 +691,7 @@ struct IndexViewModel {
                 title: ev.event.title,
                 start: ev.event.start,
                 end: ev.event.end.timeOfDay,
+                type: ev.event.type,
                 minStudents: ev.event.minStudents,
                 maxStudents: ev.event.maxStudents,
                 minAdults: ev.event.minAdults,
