@@ -5,15 +5,22 @@ import std.conv : to, text;
 import std.exception;
 import std.logger;
 import std.net.curl;
-import std.string : strip, chompPrefix;
-import std.uni : icmp;
+import std.array : appender;
+import std.string : strip, chompPrefix, indexOf, splitLines;
+import std.uni : toLower, icmp;
 import core.thread : Thread;
 import core.time;
+import std.datetime : Clock;
 
 import iopipe.json.serialize : deserialize, optional, extras, JSONIopipeException, ignoreExtras;
 import iopipe.json.dom : JSONValue;
 
+import alarmcal.db;
 import alarmcal.json;
+import alarmcal.notifications : dispatchSlack;
+
+import sqlbuilder.dataset;
+import sqlbuilder.dialect.sqlite;
 
 // Both fields are optional so that a missing "slack" block (or a partial one)
 // simply leaves Slack disabled. Never log these values.
@@ -176,4 +183,215 @@ private string findChannel(string type, string name) {
                 cursor = nc.str;
     } while(cursor.length);
     return null;
+}
+
+/// Get the email address from a Slack user's profile. Needs the users:read.email scope.
+/// Returns an empty string if the profile has no email.
+string lookupEmailByUser(string userId) {
+    auto user = slackCall("users.info", ["user": userId]).message["user"];
+    return user["profile"]["email"].str;
+}
+
+/**
+ * Check that a request to our events endpoint really came from Slack, using
+ * the signing secret (https://api.slack.com/authentication/verifying-requests-from-slack).
+ * Fails closed if no signing secret is configured, and rejects stale
+ * timestamps to prevent replays.
+ */
+bool verifySlackRequest(const(char)[] timestamp, const(char)[] signature, const(char)[] body,
+        long now = Clock.currTime.toUnixTime) {
+    import std.digest : toHexString, LetterCase, secureEqual;
+    import std.digest.hmac : HMAC;
+    import std.digest.sha : SHA256;
+    import std.string : representation;
+
+    if(config.signingSecret.length == 0)
+        return false;
+    long ts;
+    try
+        ts = timestamp.to!long;
+    catch(Exception)
+        return false;
+    enum maxSkew = 5 * 60;
+    auto diff = now - ts;
+    if(diff > maxSkew || diff < -maxSkew)
+        return false;
+
+    auto hmac = HMAC!SHA256(config.signingSecret.representation);
+    hmac.put("v0:".representation)
+        .put(timestamp.representation)
+        .put(":".representation)
+        .put(body.representation);
+    auto expected = hmac.finish.toHexString!(LetterCase.lower);
+    return expected.length + 3 == signature.length &&
+        signature[0 .. 3] == "v0=" && // standard equal ok here, it should always pass and is not related to the signature
+        secureEqual(expected[], signature[3 .. $]);
+}
+
+unittest {
+    import alarmcal.app : appconfig = config;
+    (cast()appconfig).slack.signingSecret = "testsecret";
+    scope(exit) (cast()appconfig).slack.signingSecret = null;
+
+    enum body = `{"type":"url_verification","challenge":"abc123"}`;
+    enum ts = "1700000000";
+    // generated independently with openssl: HMAC-SHA256 of "v0:<ts>:<body>"
+    enum sig = "v0=1158d46067d687bac21e6a5e6a6be0a85c085481afe2b88931e62ea63a664e9d";
+    enum now = 1_700_000_000L;
+
+    assert(verifySlackRequest(ts, sig, body, now));
+    // still fine within the allowed clock skew, rejected beyond it
+    assert(verifySlackRequest(ts, sig, body, now + 299));
+    assert(verifySlackRequest(ts, sig, body, now - 299));
+    assert(!verifySlackRequest(ts, sig, body, now + 301));
+    assert(!verifySlackRequest(ts, sig, body, now - 301));
+    // tampering with any signed part, or the signature itself
+    assert(!verifySlackRequest(ts, sig, body ~ " ", now));
+    assert(!verifySlackRequest("1700000001", sig, body, now));
+    assert(!verifySlackRequest(ts, sig[0 .. $ - 1] ~ "0", body, now));
+    assert(!verifySlackRequest(ts, sig ~ "0", body, now));
+    assert(!verifySlackRequest(ts, sig[0 .. $ - 1], body, now));
+    assert(!verifySlackRequest(ts, sig[3 .. $], body, now)); // missing "v0="
+    assert(!verifySlackRequest(ts, "v1" ~ sig[2 .. $], body, now));
+    assert(!verifySlackRequest(ts, "", body, now));
+    // garbage timestamps
+    assert(!verifySlackRequest("", sig, body, now));
+    assert(!verifySlackRequest("abc", sig, body, now));
+    // no configured secret fails closed
+    (cast()appconfig).slack.signingSecret = null;
+    assert(!verifySlackRequest(ts, sig, body, now));
+}
+
+// The outer wrapper of an Events API delivery. Everything else (e.g. "event")
+// lands in the extras.
+struct SlackEnvelope {
+    @optional string type;
+    @optional string challenge; // only for url_verification
+    @extras JSONValue!string _rest;
+    JsonVal rest() => JsonVal(_rest);
+}
+
+/**
+ * Process a (signature-verified) Events API payload. Returns the text to send
+ * back in the response, which is only non-empty for Slack's url_verification
+ * handshake. Never throws; errors are logged.
+ */
+string handleSlackPayload(string payload) {
+    SlackEnvelope env;
+    try
+        env = deserialize!SlackEnvelope(payload);
+    catch(JSONIopipeException ex) {
+        warningf("Ignoring malformed Slack payload: %s", ex.msg);
+        return null;
+    }
+    if(env.type == "url_verification")
+        return env.challenge;
+    if(env.type == "event_callback") {
+        if(auto ev = env.rest["event"]) {
+            try
+                handleSlackEvent(ev);
+            catch(Exception e)
+                errorf("Error handling Slack event: %s", e.msg);
+        }
+    }
+    return null;
+}
+
+// Remove <@U123> user mentions from message text.
+private string stripMentions(string text) {
+    auto result = appender!string;
+    while(text.length) {
+        auto start = text.indexOf("<@");
+        auto end = start < 0 ? -1 : text[start .. $].indexOf('>');
+        if(end < 0) {
+            result ~= text;
+            break;
+        }
+        result ~= text[0 .. start];
+        text = text[start + end + 1 .. $];
+    }
+    return result.data;
+}
+
+private void handleSlackEvent(ref JsonVal ev) {
+    switch(ev["type"].str) {
+        case "app_mention":
+            break;
+        case "message":
+            // only direct messages to us, and never anything a bot (including
+            // ourselves) or an edit/delete/etc. produced.
+            if(ev["channel_type"].str != "im" || (ev["subtype"]) || (ev["bot_id"]))
+                return;
+            break;
+        default:
+            return;
+    }
+    auto user = ev["user"].str;
+    if(user.length == 0)
+        return;
+
+    // the first word is the command, with an optional leading slash, since
+    // Slack won't let people send a message that starts with "/" in a channel.
+    auto words = stripMentions(ev["text"].str.strip.chompPrefix("/").strip).splitter;
+    auto command = words.empty ? "" : words.front;
+    switch(command) {
+        case "link":
+            return linkSlackUser(user);
+        case "unlink":
+            return unlinkSlackUser(user);
+        default:
+            return dispatchSlack(user, "Sorry, I didn't understand that. I know these commands:\n" ~
+                    "• `/link` - link your Slack account to your alarmcal account\n" ~
+                    "• `/unlink` - remove that link");
+    }
+}
+
+private void linkSlackUser(string slackUser) {
+    import alarmcal.app : db;
+    DataSet!Person ds;
+
+    auto existing = db.fetchOne(select(ds).where(i"$(ds.slack_id) = $(slackUser)"), Person.init);
+    if(existing.id != -1) {
+        return dispatchSlack(slackUser, "You are already linked to the alarmcal account for " ~ existing.name ~
+                ". Use `/unlink` first if you want to change that.");
+    }
+
+    string email;
+    try
+        email = lookupEmailByUser(slackUser);
+    catch(SlackException e) {
+        errorf("Could not get the email for Slack user %s: %s", slackUser, e.msg);
+        return dispatchSlack(slackUser, "Sorry, I couldn't look up your Slack email address. Please ask a mentor for help.");
+    }
+
+    auto person = email.length ? db.fetchOne(select(ds).where(i"$(ds.email) = $(email) AND $(ds.active) = 1"), Person.init) : Person.init;
+    if(person.id == -1) {
+        return dispatchSlack(slackUser, "I couldn't find an alarmcal account that matches your Slack email address" ~
+                (email.length ? " (" ~ email ~ ")" : "") ~
+                ". Please make sure your Slack email matches your alarmcal email, then try `/link` again.");
+    }
+    if(!person.slack_id.isNull) {
+        // this alarmcal account is linked to a different Slack account; relinking is allowed
+        // because the Slack email vouches for the person.
+        infof("Person id:%d '%s' is being relinked from Slack user %s to %s", person.id, person.name, person.slack_id.get, slackUser);
+    }
+    person.slack_id = slackUser;
+    db.save(person);
+    infof("Person id:%d '%s' linked Slack user %s", person.id, person.name, slackUser);
+    dispatchSlack(slackUser, "You are now linked to the alarmcal account for " ~ person.name ~
+            ". I will send you a DM when you change your RSVP for an event; you can turn that off in your alarmcal profile. " ~
+            "Use `/unlink` to remove the link.");
+}
+
+private void unlinkSlackUser(string slackUser) {
+    import alarmcal.app : db;
+    DataSet!Person ds;
+
+    auto person = db.fetchOne(select(ds).where(i"$(ds.slack_id) = $(slackUser)"), Person.init);
+    if(person.id == -1)
+        return dispatchSlack(slackUser, "Your Slack account isn't linked to an alarmcal account. Use `/link` to link it.");
+    person.slack_id.nullify();
+    db.save(person);
+    infof("Person id:%d '%s' unlinked Slack user %s", person.id, person.name, slackUser);
+    dispatchSlack(slackUser, "Your Slack account is no longer linked to alarmcal. I won't send you any more notifications.");
 }

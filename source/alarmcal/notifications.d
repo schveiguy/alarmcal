@@ -101,6 +101,26 @@ void dispatchSlack(string channel, string text, string blocks = null) {
         notificationTid.send(SendSlack(channel, text, blocks));
 }
 
+/**
+ * DM a person about an event, if they are linked to Slack and haven't opted
+ * out of Slack notifications.
+ */
+void sendEventSlack(Event event, string message, Person recipient) {
+    import alarmcal.app : appconfig = config;
+    import alarmcal.dietutils : fullDatePrinter, timePrinter;
+    import alarmcal.formudas : fieldNameToCapitals;
+    import std.conv : to, text;
+
+    if(recipient.slack_id.isNull || !recipient.slackNotifications)
+        return;
+    // Slack's mrkdwn treats these as control characters
+    static string esc(string s) => s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    dispatchSlack(recipient.slack_id.get, i"$(esc(message))
+*$(esc(event.title))* ($(fieldNameToCapitals(event.type.to!string)) event)
+$(event.start.date.fullDatePrinter), $(event.start.timeOfDay.timePrinter) - $(event.end.timeOfDay.timePrinter)
+<$(appconfig.host)|Manage your participation on alarmcal>".text);
+}
+
 private void handle(SendSlack ss) {
     import alarmcal.slack : postMessage;
     // a Slack failure must never kill the notification thread

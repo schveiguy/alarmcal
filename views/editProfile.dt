@@ -5,6 +5,6 @@ block content
 
   form(method="POST", action="/performEditProfile")
     section
-      - createForm(currentUser, onlyThese: ["name", "email", "password_hash"]);
+      - createForm(currentUser, onlyThese: ["name", "email", "password_hash", "slackNotifications"]);
     .form-group
       button(type="submit") Submit

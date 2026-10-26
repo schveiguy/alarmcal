@@ -155,6 +155,10 @@ public struct JsonVal {
         return cast(inout(JsonVal)*) (k in _value.object);
     }
 
-    // for convenience
+    // use opcast to bool to check if the value is valid
+    bool opCast(T: bool)() => type != Type.Undefined;
+
+    // Convenience function to get a string with a default value. Since strings
+    // are very common, we give it a dedicated function.
     auto str(string defaultValue = "") inout => get!string(defaultValue);
 }

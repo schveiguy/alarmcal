@@ -68,6 +68,8 @@ struct Person
     bool admin;
     bool active = true;
     bool prospect; // has not yet joined the team; limited to prospect-friendly events, and cannot see other attendees
+    @noform Nullable!string slack_id; // Slack user ID, set by the `/link` Slack command
+    bool slackNotifications = true; // DM this person about their events (only if linked)
 
     static @mapping("person_id") @refersTo!PersonEvent Relation events;
 }
@@ -240,6 +242,7 @@ void applyMigrations()
         addPersonProspect(),
         addEventProspectsAllowed(),
         makePersonEmailCaseInsensitive(),
+        addPersonSlack(),
     ];
 
     auto db = openDB();
@@ -424,5 +427,13 @@ Migration makePersonEmailCaseInsensitive() {
     result.add(`INSERT INTO "Person_new" (id, memberType, name, email, password_hash, admin, invitation_id, reset_password_id, reset_password_time, active, prospect) SELECT id, memberType, name, email, password_hash, admin, invitation_id, reset_password_id, reset_password_time, active, prospect FROM "Person"`);
     result.add(`DROP TABLE "Person"`);
     result.add(`ALTER TABLE "Person_new" RENAME TO "Person"`);
+    return result;
+}
+
+Migration addPersonSlack() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Person ADD COLUMN slack_id TEXT DEFAULT NULL`);
+    result.add(`ALTER TABLE Person ADD COLUMN slackNotifications INTEGER NOT NULL DEFAULT 1`);
     return result;
 }
