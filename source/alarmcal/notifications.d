@@ -29,6 +29,12 @@ struct SendEmail {
     Email email;
 }
 
+struct SendSlack {
+    string channel; // channel ID, or user ID for a DM
+    string text;
+    string blocks; // optional Block Kit JSON array
+}
+
 Tid notificationTid;
 
 private ref const(NotificationConfig) config() {
@@ -49,6 +55,7 @@ void notificationThread() {
         receiveTimeout(sleepTime,
             (Shutdown s) { exiting = true; },
             (shared(SendEmail) sem) { handle(cast(SendEmail)sem); },
+            (SendSlack ss) { handle(ss); },
         );
         auto cur = MonoTime.currTime;
         auto elapsed = cur - lastPoke;
@@ -77,6 +84,50 @@ void dispatchEmail(Email email) {
 
 private void handle(SendEmail sem) {
     sendEmail(sem.email);
+}
+
+/**
+ * Send a Slack message to a channel ID, or to a user ID as a DM. Like
+ * dispatchEmail, the actual API call happens on the notification thread so
+ * request workers never block on Slack. Does nothing if Slack isn't configured.
+ */
+void dispatchSlack(string channel, string text, string blocks = null) {
+    import alarmcal.slack : slackEnabled;
+    if(!slackEnabled)
+        return;
+    if(notificationTid is Tid.init)
+        handle(SendSlack(channel, text, blocks));
+    else
+        notificationTid.send(SendSlack(channel, text, blocks));
+}
+
+/**
+ * DM a person about an event, if they are linked to Slack and haven't opted
+ * out of Slack notifications.
+ */
+void sendEventSlack(Event event, string message, Person recipient) {
+    import alarmcal.app : appconfig = config;
+    import alarmcal.dietutils : fullDatePrinter, timePrinter;
+    import alarmcal.formudas : fieldNameToCapitals;
+    import std.conv : to, text;
+
+    if(recipient.slack_id.isNull || !recipient.slackNotifications)
+        return;
+    // Slack's mrkdwn treats these as control characters
+    static string esc(string s) => s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    dispatchSlack(recipient.slack_id.get, i"$(esc(message))
+*$(esc(event.title))* ($(fieldNameToCapitals(event.type.to!string)) event)
+$(event.start.date.fullDatePrinter), $(event.start.timeOfDay.timePrinter) - $(event.end.timeOfDay.timePrinter)
+<$(appconfig.host)|Manage your participation on alarmcal>".text);
+}
+
+private void handle(SendSlack ss) {
+    import alarmcal.slack : postMessage;
+    // a Slack failure must never kill the notification thread
+    try
+        postMessage(ss.channel, ss.text, ss.blocks);
+    catch(Exception e)
+        errorf("Could not send Slack message to %s: %s", ss.channel, e.msg);
 }
 
 private void poke() {

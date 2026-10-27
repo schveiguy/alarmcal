@@ -10,6 +10,24 @@ permissions:
   contents: write
 
 jobs:
+  unittest:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsqlite3-dev
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v2
+        with:
+          compiler: ldc-1.43.0
+
+      - name: Run tests
+        run: dub -b unittest --compiler=ldc2
   build:
     runs-on: ubuntu-24.04
 
@@ -24,13 +42,10 @@ jobs:
       - name: Install LDC
         uses: dlang-community/setup-dlang@v2
         with:
-          compiler: ldc-1.41.0
+          compiler: ldc-1.43.0
 
       - name: Build
         run: dub build --compiler=ldc2
-
-      #- name: Run tests (note: no tests yet)
-      #  run: dub -b unittest --compiler=ldc2
 
       - name: Package artifact
         run: tar czf alarmcal.tar.gz alarmcal views/*.css views/*.js

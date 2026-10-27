@@ -6,6 +6,7 @@ import alarmcal.session;
 import alarmcal.mail;
 import alarmcal.dietutils;
 import alarmcal.notifications;
+import alarmcal.slack : SlackConfig;
 import form = alarmcal.formudas;
 
 import std.array;
@@ -53,10 +54,33 @@ int cliAddUser(string[] args) {
     return 0;
 }
 
+// Verify Slack connectivity. With a target, also sends a test message:
+//   user@example.com -> DM to that person (looked up by email)
+//   #name            -> that channel (looked up by name)
+//   anything else    -> used as a Slack channel/user ID as-is
+int cliSlackTest(string[] args) {
+    import alarmcal.slack;
+    import std.stdio;
+    enforce(args.length <= 1, "usage: cli slackTest [email|#channel|id]");
+    enforce(slackEnabled, "No slack.botToken in " ~ ConfigFileName);
+    auto auth = authTest();
+    writeln(i"Authenticated as '$(auth.user)' in workspace '$(auth.team)'");
+    if(args.length == 1) {
+        string target = args[0];
+        if(target.canFind('@'))
+            target = lookupUserByEmail(target);
+        else if(target.startsWith('#'))
+            target = resolveChannel(target);
+        postMessage(target, "Hello from alarmcal! Slack connectivity is working.");
+        writeln(i"Posted test message to $(target)");
+    }
+    return 0;
+}
 
 struct Config {
     EmailConfig email;
     @optional NotificationConfig notifications;
+    @optional SlackConfig slack;
     @optional string timeZone = "US/Eastern";
     @optional string host = "https://alarmcal.info";
 }
@@ -95,6 +119,8 @@ int main(string[] args)
         switch(args[2]) {
             case "addUser":
                 return cliAddUser(args[3 .. $]);
+            case "slackTest":
+                return cliSlackTest(args[3 .. $]);
             default:
                 throw new Exception("Unknown cli command: " ~ args[2]);
         }
@@ -399,6 +425,7 @@ void checkSession(Request request, Output output){
         "/invite",
         "/performLogin",
         "/poke",
+        "/slack/events", // authenticated by Slack's request signature instead
         "/forgotpassword",
         "/performForgotPassword",
         "/calendarData",
@@ -1012,7 +1039,7 @@ void editProfileForm(Request request, Output output) {
 void performEditProfile(Request request, Output output) {
     import std.conv : to;
     auto p = currentUser;
-    request.post.extract(p, onlyThese: ["name", "email", "password_hash"]);
+    request.post.extract(p, onlyThese: ["name", "email", "password_hash", "slackNotifications"]);
     auto pwChanged = currentUser.password_hash != p.password_hash;
     db.save(p);
     if(pwChanged) {
@@ -1265,6 +1292,12 @@ void rsvp(Request request, Output output) {
     auto existing = db.fetchOne(select(ds).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event_id) = $(p.event_id)"), PersonEvent.init);
     auto studentCount = db.fetchOne(select(count(ds.id)).where(i"$(ds.event_id) = $(p.event_id) AND $(ds.attending) = 1 AND $(ds.person.memberType) = $(MemberType.student)"));
 
+    // tell the person about the change, by email and (if they opted in) Slack DM
+    void notifyRsvp(string message, bool isAttending) {
+        sendEventEmail(ev, message, isAttending, currentUser);
+        sendEventSlack(ev, message, currentUser);
+    }
+
     auto eventFull = ev.maxStudents > 0 && studentCount >= ev.maxStudents;
 
     if(existing.id != -1) {
@@ -1275,7 +1308,7 @@ void rsvp(Request request, Output output) {
             case none:
                 db.erase(existing);
                 infof("Withdrew RSVP for event_id:%s by %s", p.event_id, currentUser.name);
-                sendEventEmail(ev, "You have withdrawn your response for this event.", isAttending: false, currentUser);
+                notifyRsvp("You have withdrawn your response for this event.", isAttending: false);
                 break;
             case attending:
                 if(!existing.attending) {
@@ -1287,7 +1320,7 @@ void rsvp(Request request, Output output) {
                     existing.attending = true;
                     db.save(existing);
                     infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
-                    sendEventEmail(ev, "You have signed up for this event.", isAttending: true, currentUser);
+                    notifyRsvp("You have signed up for this event.", isAttending: true);
                 }
                 break;
             case declined:
@@ -1295,7 +1328,7 @@ void rsvp(Request request, Output output) {
                     existing.attending = false;
                     db.save(existing);
                     infof("Declined event_id:%s by %s", p.event_id, currentUser.name);
-                    sendEventEmail(ev, "You have declined this event.", isAttending: false, currentUser);
+                    notifyRsvp("You have declined this event.", isAttending: false);
                 }
                 break;
         }
@@ -1314,10 +1347,10 @@ void rsvp(Request request, Output output) {
                     ));
         if(p.response == RSVPResponse.attending) {
             infof("RSVP'd for event_id:%s by %s", p.event_id, currentUser.name);
-            sendEventEmail(ev, "You have signed up for this event.", isAttending: true, currentUser);
+            notifyRsvp("You have signed up for this event.", isAttending: true);
         } else {
             infof("Declined event_id:%s by %s", p.event_id, currentUser.name);
-            sendEventEmail(ev, "You have declined this event.", isAttending: false, currentUser);
+            notifyRsvp("You have declined this event.", isAttending: false);
         }
     }
     output.redirect(p.style.length ? "/?style=" ~ p.style : "/");
@@ -1399,6 +1432,28 @@ void eventPopupJs(Request request, Output output) {
 @getRoute!"/assets/js/autorefresh.js"
 void autoRefreshJs(Request request, Output output) {
     output.serveStaticFile("views/autorefresh.js", "text/javascript; charset=utf-8");
+}
+
+// Slack Events API endpoint. Not behind login (see checkSession's allowlist);
+// instead every request must carry a valid Slack signature.
+@endpoint
+@postRoute!"/slack/events"
+void slackEvents(Request request, Output output) {
+    import alarmcal.slack : verifySlackRequest, handleSlackPayload;
+    auto body = request.body.data;
+    if(!verifySlackRequest(request.header.read("x-slack-request-timestamp", ""),
+                request.header.read("x-slack-signature", ""), body)) {
+        output.status = 403;
+        return output.write("Unauthorized!");
+    }
+    output.status = 200;
+    // Slack retries (and flags them with this header) if we are slow to
+    // answer. The original delivery is already being handled, so don't repeat it.
+    if(request.header.read("x-slack-retry-num", "").length) {
+        return output.write("ok");
+    }
+    output.addHeader("content-type", "text/plain");
+    output.write(handleSlackPayload(body.idup));
 }
 
 @endpoint
