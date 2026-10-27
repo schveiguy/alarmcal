@@ -313,6 +313,38 @@ private string stripMentions(string text) {
     return result.data;
 }
 
+/**
+ * Extract the command from a message: the first word once user mentions are
+ * removed, lowercased, without an optional leading slash (Slack won't let
+ * people send a channel message that starts with "/", so they write
+ * "@alarmcal /link"). Returns an empty string if there is no command.
+ */
+private string parseCommand(string text) {
+    auto words = stripMentions(text).strip.chompPrefix("/").splitter;
+    return words.empty ? "" : words.front.toLower;
+}
+
+unittest {
+    assert(parseCommand("link") == "link");
+    assert(parseCommand("/link") == "link");
+    assert(parseCommand("<@U0123ABC> /link") == "link");
+    assert(parseCommand("<@U0123ABC> link") == "link");
+    assert(parseCommand("<@U0123ABC>/link") == "link");
+    assert(parseCommand("  <@U0123ABC>   /Unlink  ") == "unlink");
+    assert(parseCommand("LINK please") == "link");
+    assert(parseCommand("/link\nextra") == "link");
+    assert(parseCommand("<@U0123ABC> hello there") == "hello");
+    // mentions anywhere are removed, and an unterminated one is left alone
+    assert(parseCommand("link <@U0123ABC>") == "link");
+    assert(parseCommand("<@U0123ABC> <@U0456DEF> link") == "link");
+    assert(parseCommand("<@U0123ABC link") == "<@u0123abc");
+    // nothing to parse
+    assert(parseCommand("") == "");
+    assert(parseCommand("   ") == "");
+    assert(parseCommand("<@U0123ABC>") == "");
+    assert(parseCommand("/") == "");
+}
+
 private void handleSlackEvent(ref JsonVal ev) {
     switch(ev["type"].str) {
         case "app_mention":
@@ -330,11 +362,7 @@ private void handleSlackEvent(ref JsonVal ev) {
     if(user.length == 0)
         return;
 
-    // the first word is the command, with an optional leading slash, since
-    // Slack won't let people send a message that starts with "/" in a channel.
-    auto words = stripMentions(ev["text"].str.strip.chompPrefix("/").strip).splitter;
-    auto command = words.empty ? "" : words.front;
-    switch(command) {
+    switch(parseCommand(ev["text"].str)) {
         case "link":
             return linkSlackUser(user);
         case "unlink":

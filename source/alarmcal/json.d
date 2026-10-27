@@ -27,14 +27,15 @@ public struct JsonVal {
     Type type() const => cast(Type)_value.type;
 
     inout(JsonVal) opIndex(size_t idx) inout{
-        if(type == Type.Array)
+        if(type == Type.Array && _value.array.length > idx)
             return inout(JsonVal)(_value.array[idx]);
         return undefinedValue;
     }
 
     inout(JsonVal) opIndex(string key) inout {
         if(type == Type.Obj)
-            return inout(JsonVal)(_value.object[key]);
+            if(auto v = key in _value.object)
+                return inout(JsonVal)(*v);
         return undefinedValue;
     }
 
