@@ -186,6 +186,19 @@ table.item-table thead tr {
   border-bottom: 2px solid #888;
 }
 
+table.item-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+table.item-table th.sortable[aria-sort="ascending"]::after {
+  content: " \25B2";
+}
+
+table.item-table th.sortable[aria-sort="descending"]::after {
+  content: " \25BC";
+}
+
 table.item-table th {
   background-color: #dde;
 }

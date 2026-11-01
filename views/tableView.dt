@@ -19,7 +19,7 @@
               input#bulk-all(type="checkbox", title="Select all")
             - static foreach(idx; 0 .. T.tupleof.length)
               - static if(!hasUDA!(T.tupleof[idx], password) && (hasUDA!(T.tupleof[idx], showInTable) || !hasUDA!(T.tupleof[idx], noform)))
-                th #{getFieldLabel!(T.tupleof[idx])}
+                th.sortable #{getFieldLabel!(T.tupleof[idx])}
             th
         tbody
           - foreach(item; items)
@@ -33,7 +33,7 @@
                   - else static if(is(typeof(T.tupleof[idx]) == bool))
                     td #{item.tupleof[idx] ? "Yes" : "No"}
                   - else static if(is(typeof(T.tupleof[idx]) == DateTime))
-                    td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
+                    td(data-sort=item.tupleof[idx].toISOExtString()) #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}
                   - else
                     td #{item.tupleof[idx]}
               td
@@ -69,4 +69,26 @@
           refresh();
         });
         boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+
+        var table = form.querySelector('table.item-table');
+        var tbody = table.tBodies[0];
+        var heads = Array.prototype.slice.call(table.querySelectorAll('th'));
+        var collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+        function cellValue(row, col) {
+          var c = row.cells[col];
+          return c.hasAttribute('data-sort') ? c.getAttribute('data-sort') : c.textContent.trim();
+        }
+        heads.forEach(function (th, col) {
+          if (!th.classList.contains('sortable')) return;
+          th.addEventListener('click', function () {
+            var dir = th.getAttribute('aria-sort') == 'ascending' ? -1 : 1;
+            heads.forEach(function (h) { h.removeAttribute('aria-sort'); });
+            th.setAttribute('aria-sort', dir == 1 ? 'ascending' : 'descending');
+            var rows = Array.prototype.slice.call(tbody.rows);
+            rows.sort(function (a, b) {
+              return dir * collator.compare(cellValue(a, col), cellValue(b, col));
+            });
+            rows.forEach(function (r) { tbody.appendChild(r); });
+          });
+        });
       })();
