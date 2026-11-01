@@ -102,3 +102,18 @@ void renderDiet(Args...)(ref Output output)
     output.addHeader("content-type", "text/html");
     output.write(renderDiet!Args());
 }
+
+string mask(T)(T data)
+{
+    import std.conv;
+    import std.typecons;
+    static if(is(T == Nullable!U, U)) {
+        if(data.isNull)
+            return "";
+    }
+    auto val = data.to!string;
+    if(val.length > 10) {
+        return val[0 .. 2] ~ "..." ~ val[$-3 .. $];
+    }
+    return "...";
+}

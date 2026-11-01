@@ -59,7 +59,7 @@ struct Person
 {
     @primaryKey @autoIncrement int id = -1;
     MemberType memberType;
-    @noform Nullable!string invitation_id;
+    @noform @sensitive @showInTable Nullable!string invitation_id;
     @noform Nullable!string reset_password_id;
     @noform Nullable!DateTime reset_password_time;
     string name;
@@ -68,7 +68,7 @@ struct Person
     bool admin;
     bool active = true;
     bool prospect; // has not yet joined the team; limited to prospect-friendly events, and cannot see other attendees
-    @noform Nullable!string slack_id; // Slack user ID, set by the `/link` Slack command
+    @noform @sensitive @showInTable Nullable!string slack_id; // Slack user ID, set by the `/link` Slack command
     bool slackNotifications = true; // DM this person about their events (only if linked)
 
     static @mapping("person_id") @refersTo!PersonEvent Relation events;

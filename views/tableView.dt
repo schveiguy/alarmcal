@@ -18,7 +18,7 @@
             th.bulk-col(hidden)
               input#bulk-all(type="checkbox", title="Select all")
             - static foreach(idx; 0 .. T.tupleof.length)
-              - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
+              - static if(!hasUDA!(T.tupleof[idx], password) && (hasUDA!(T.tupleof[idx], showInTable) || !hasUDA!(T.tupleof[idx], noform)))
                 th #{getFieldLabel!(T.tupleof[idx])}
             th
         tbody
@@ -27,8 +27,10 @@
               td.bulk-col(hidden)
                 input.bulk-select(type="checkbox", name="id", value=(item.id))
               - static foreach(idx; 0 .. T.tupleof.length)
-                - static if(!hasUDA!(T.tupleof[idx], password) && !hasUDA!(T.tupleof[idx], noform))
-                  - static if(is(typeof(T.tupleof[idx]) == bool))
+                - static if(!hasUDA!(T.tupleof[idx], password) && (hasUDA!(T.tupleof[idx], showInTable) || !hasUDA!(T.tupleof[idx], noform)))
+                  - static if(hasUDA!(T.tupleof[idx], sensitive))
+                    td #{item.tupleof[idx].mask}
+                  - else static if(is(typeof(T.tupleof[idx]) == bool))
                     td #{item.tupleof[idx] ? "Yes" : "No"}
                   - else static if(is(typeof(T.tupleof[idx]) == DateTime))
                     td #{item.tupleof[idx].date.datePrinter} #{item.tupleof[idx].timeOfDay}

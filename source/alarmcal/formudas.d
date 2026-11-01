@@ -46,3 +46,9 @@ template getFieldLabel(alias field) {
     else
         enum getFieldLabel = fieldNameToCapitals(__traits(identifier, field));
 }
+
+// Show the value in the table even if it's noform.
+enum showInTable;
+
+// sensitive data for the table
+enum sensitive;
