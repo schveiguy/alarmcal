@@ -252,6 +252,7 @@ p.event-type-outreach             { background-color: #d4edda; }
 p.event-type-competition          { background-color: #f8d7da; }
 p.event-type-offseasonCompetition { background-color: #fde8c8; }
 p.event-type-recreation           { background-color: #e8d5f5; }
+p.event-type-fundraising          { background-color: #9fd8cd; }
 
 span.attending_check {
     color: green;
@@ -351,6 +352,9 @@ span.low_count {
 .em-declined h4 { margin: 0 0 .25rem; color: #c55; }
 .em-declined ul { margin: 0; padding-left: 1.25rem; font-size: .9rem; }
 
+.rsvp-message { font-style: italic; color: #666; }
+.em-message, .em-volunteer { background: #678; color: #fff; }
+
 .em-declined-note { display: block; margin-bottom: .4rem; width: 100%; }
 
 .em-actions {
@@ -372,7 +376,6 @@ span.low_count {
 .em-cancel-rsvp { background: #c55; color: #fff; }
 .em-decline     { background: #c80; color: #fff; }
 .em-attend      { background: #3a7; color: #fff; }
-.em-withdraw    { background: #888; color: #fff; }
 .em-edit        { background: #57b; color: #fff; }
 .em-delete      { background: #c55; color: #fff; }
 .em-disabled    { background: #555; color: #fff; }

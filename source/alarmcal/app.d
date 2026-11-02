@@ -11,7 +11,8 @@ import form = alarmcal.formudas;
 
 import std.array;
 import std.datetime;
-import std.conv : text;
+import std.conv : text, to;
+import std.string : strip;
 import core.time;
 import std.typecons;
 import std.logger;
@@ -598,6 +599,11 @@ void logout(Request request, Output output) {
     output.redirect("/login");
 }
 
+// Mentors can record volunteer hours for any event that has started.
+bool canEditVolunteerHours(ref const Event ev) {
+    return currentUser.memberType == MemberType.mentor && ev.start.date <= cast(Date)getTime();
+}
+
 struct IndexViewModel {
     enum DisplayStyle {
         calendar,
@@ -682,12 +688,14 @@ struct IndexViewModel {
                         string name;
                         MemberType type;
                         bool checkedIn;
+                        string message;
                     }
                     auto p = people[item.person_id];
                     auto pv = PersonView(
                         name: p.name,
                         type: p.memberType,
-                        checkedIn: item.attendanceRecorded
+                        checkedIn: item.attendanceRecorded,
+                        message: item.message
                     );
 
                     serializeImpl(writer, pv);
@@ -706,6 +714,7 @@ struct IndexViewModel {
             int maxStudents;
             int minAdults;
             bool prospectsAllowed;
+            bool canEditVolunteer; // current user is a mentor and the event has started
 
             EventAnalysis analysis;
 
@@ -723,6 +732,7 @@ struct IndexViewModel {
                 maxStudents: ev.event.maxStudents,
                 minAdults: ev.event.minAdults,
                 prospectsAllowed: ev.event.prospectsAllowed,
+                canEditVolunteer: canEditVolunteerHours(ev.event),
 
                 analysis: eventAnalysis(ev),
 
@@ -1269,13 +1279,13 @@ void rsvp(Request request, Output output) {
     enum RSVPResponse {
         attending, // signed up, counts towards event limits
         declined, // explicitly not attending, does not count towards event limits
-        none, // withdraw any previous response
     }
 
     static struct params {
         int event_id;
         RSVPResponse response;
         @(form.optional) string style;
+        @(form.optional) bool messageChecked; // set once the message prompt has been shown
     }
     auto p = request.get.extract!params;
     auto ev = db.fetchUsingKey!Event(Event.init, p.event_id);
@@ -1304,12 +1314,15 @@ void rsvp(Request request, Output output) {
         if(existing.attendanceRecorded)
             return output.messageRedirect("Cannot change RSVP", "You have already checked in for this event, and cannot cancel or decline it.");
 
+        // switching between attending and declining with a message present
+        // always gives the person a chance to edit the message first.
+        if(!p.messageChecked && existing.message.length
+                && (p.response == RSVPResponse.attending) != existing.attending) {
+            import std.uri : encodeComponent;
+            return output.redirect(i"/rsvpMessage?event_id=$(p.event_id)&response=$(p.response)&style=$(encodeComponent(p.style))".text);
+        }
+
         with(RSVPResponse) final switch(p.response) {
-            case none:
-                db.erase(existing);
-                infof("Withdrew RSVP for event_id:%s by %s", p.event_id, currentUser.name);
-                notifyRsvp("You have withdrawn your response for this event.", isAttending: false);
-                break;
             case attending:
                 if(!existing.attending) {
                     if(eventFull) {
@@ -1333,7 +1346,7 @@ void rsvp(Request request, Output output) {
                 break;
         }
     }
-    else if(p.response != RSVPResponse.none) {
+    else {
         // add the rsvp/decline
         if(p.response == RSVPResponse.attending && eventFull) {
             // can't now sign up for this event
@@ -1354,6 +1367,134 @@ void rsvp(Request request, Output output) {
         }
     }
     output.redirect(p.style.length ? "/?style=" ~ p.style : "/");
+}
+
+@endpoint
+@getRoute!"/rsvpMessage"
+void rsvpMessageForm(Request request, Output output) {
+    static struct params {
+        int event_id;
+        @(form.optional) string response; // pending attending/declined change, applied after saving
+        @(form.optional) string style;
+    }
+    auto p = request.get.extract!params;
+
+    DataSet!PersonEvent ds;
+    auto rows = db.fetch(select(ds, ds.event).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event_id) = $(p.event_id)"));
+    if(rows.empty) {
+        output.status = 400;
+        return output.messageRedirect("No response", "Attend or decline the event before adding a message.");
+    }
+    auto existing = rows.front[0];
+    auto ev = rows.front[1];
+    string response = p.response;
+    string style = p.style;
+    output.renderDiet!("editMessage.dt", currentUser, ev, existing, response, style);
+}
+
+@endpoint
+@postRoute!"/performRsvpMessage"
+void performRsvpMessage(Request request, Output output) {
+    import std.uri : encodeComponent;
+    static struct params {
+        int event_id;
+        @(form.optional) string response;
+        @(form.optional) string style;
+        @(form.optional) string message;
+    }
+    auto p = request.post.extract!params;
+    p.message = p.message.strip;
+    if(p.message.length > 50) {
+        output.status = 400;
+        return output.messageRedirect("Message too long", "Messages are limited to 50 characters.");
+    }
+    DataSet!PersonEvent ds;
+    auto existing = db.fetchOne(select(ds).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event_id) = $(p.event_id)"), PersonEvent.init);
+    if(existing.id == -1) {
+        output.status = 400;
+        return output.messageRedirect("No response", "Attend or decline the event before adding a message.");
+    }
+    existing.message = p.message;
+    db.save(existing);
+    if(p.response == "attending" || p.response == "declined")
+        return output.redirect(i"/rsvp?event_id=$(p.event_id)&response=$(p.response)&style=$(encodeComponent(p.style))&messageChecked=true".text);
+    output.redirect(p.style.length ? "/?style=" ~ encodeComponent(p.style) : "/");
+}
+
+bool canViewVolunteer(int personId) {
+    return currentUser.id == personId || currentUser.admin || currentUser.memberType == MemberType.mentor;
+}
+
+@endpoint
+@getRoute!"/volunteer"
+void volunteerPage(Request request, Output output) {
+    static struct params { int id; }
+    auto p = request.get.extract!params;
+    auto student = db.fetchUsingKey!Person(Person.init, p.id);
+    if(student.id == -1) {
+        output.status = 400;
+        return output.messageRedirect("Invalid person", "Invalid person id specified.");
+    }
+    if(!canViewVolunteer(student.id)) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "You cannot view this person's volunteer hours.");
+    }
+    DataSet!PersonEvent ds;
+    auto entries = db.fetch(select(ds.event, ds.volunteerMinutes)
+        .where(i"$(ds.person_id) = $(student.id) AND $(ds.attending) = 1 AND $(ds.attendanceRecorded) = 1 AND $(ds.volunteerMinutes) <> 0")
+        .orderBy(ds.event.start));
+    output.renderDiet!("volunteer.dt", currentUser, student, entries);
+}
+
+@endpoint
+@getRoute!"/editVolunteer"
+void editVolunteerForm(Request request, Output output) {
+    if(currentUser.memberType != MemberType.mentor) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only mentors can edit volunteer hours.");
+    }
+    static struct params { int event_id; }
+    auto p = request.get.extract!params;
+    auto ev = db.fetchUsingKey!Event(Event.init, p.event_id);
+    if(ev.id == -1) {
+        output.status = 400;
+        return output.messageRedirect("Invalid event", "Invalid event id provided.");
+    }
+    DataSet!PersonEvent ds;
+    auto rows = db.fetch(select(ds.volunteerMinutes, ds.person).where(i"$(ds.event_id) = $(ev.id) AND $(ds.attending) = 1 AND $(ds.attendanceRecorded) = 1 AND $(ds.person.memberType) = $(MemberType.student)").orderBy(ds.person.name));
+    output.renderDiet!("editVolunteer.dt", currentUser, ev, rows);
+}
+
+@endpoint
+@postRoute!"/performEditVolunteer"
+void performEditVolunteer(Request request, Output output) {
+    if(currentUser.memberType != MemberType.mentor) {
+        output.status = 403;
+        return output.messageRedirect("Forbidden", "Only mentors can edit volunteer hours.");
+    }
+    int eventId = request.post.read("event_id").to!int;
+    DataSet!PersonEvent ds;
+    auto rows = db.fetch(select(ds).where(i"$(ds.event_id) = $(eventId) AND $(ds.attending) = 1 AND $(ds.attendanceRecorded) = 1 AND $(ds.person.memberType) = $(MemberType.student)")).array;
+    // validate everything first
+    int[] minutes;
+    foreach(r; rows) {
+        int m = request.post.read(i"minutes_$(r.person_id)".text, "0").to!int;
+        if(m < 0 || m > 24 * 60) {
+            output.status = 400;
+            return output.messageRedirect("Invalid time", "Exceeded time limit");
+        }
+        minutes ~= m;
+    }
+    db.begin();
+    scope(failure) db.rollback();
+    foreach(i, ref r; rows) {
+        if(r.volunteerMinutes == minutes[i]) continue;
+        r.volunteerMinutes = minutes[i];
+        db.save(r);
+        infof("Set volunteer minutes=%s for person_id:%s event_id:%s by %s", r.volunteerMinutes, r.person_id, eventId, currentUser.name);
+    }
+    db.commit();
+    output.redirect("/");
 }
 
 @endpoint

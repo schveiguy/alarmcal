@@ -86,7 +86,8 @@ enum EventType {
     outreach,
     competition,
     offseasonCompetition,
-    recreation
+    recreation,
+    fundraising
 }
 
 struct Event
@@ -114,6 +115,8 @@ struct PersonEvent
     @primaryKey @autoIncrement int id = -1; // needed for updating.
     @mustReferTo!Person("person") int person_id;
     @mustReferTo!Event("event") int event_id;
+    int volunteerMinutes;
+    string message;
     bool attendanceRecorded;
     bool attending = true; // false if the person has explicitly declined the event
 }
@@ -243,6 +246,7 @@ void applyMigrations()
         addEventProspectsAllowed(),
         makePersonEmailCaseInsensitive(),
         addPersonSlack(),
+        addPersonEventVolunteerAndMessage(),
     ];
 
     auto db = openDB();
@@ -435,5 +439,13 @@ Migration addPersonSlack() {
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE Person ADD COLUMN slack_id TEXT DEFAULT NULL`);
     result.add(`ALTER TABLE Person ADD COLUMN slackNotifications INTEGER NOT NULL DEFAULT 1`);
+    return result;
+}
+
+Migration addPersonEventVolunteerAndMessage() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE PersonEvent ADD COLUMN volunteerMinutes INTEGER NOT NULL DEFAULT 0`);
+    result.add(`ALTER TABLE PersonEvent ADD COLUMN message TEXT NOT NULL DEFAULT ''`);
     return result;
 }

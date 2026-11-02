@@ -1,0 +1,27 @@
+extends layout
+block content
+  - import alarmcal.dietutils;
+  - import std.datetime;
+  h1 Volunteer Hours for #{student.name}
+  - if(entries.empty)
+    p No volunteer hours have been recorded.
+  - else
+    - int totalMinutes = 0;
+    div.table-wrap
+      table.item-table
+        thead
+          tr
+            th Date
+            th Event
+            th Time
+        tbody
+          - foreach(ev, minutes; entries)
+            - totalMinutes += minutes;
+            tr
+              td #{ev.start.date.datePrinter}
+              td #{ev.title}
+              td #{minutes.minutesPrinter}
+        tfoot
+          tr
+            th(colspan="2") Total
+            th #{totalMinutes.minutesPrinter}

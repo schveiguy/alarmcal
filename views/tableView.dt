@@ -5,7 +5,7 @@
 - import std.conv;
 - import std.datetime;
 
-- void tableView(T)(T[] items, string editRoute, string bulkRoute)
+- void tableView(T)(T[] items, string editRoute, string bulkRoute, ExtraLink!T[] extraLinks = null)
   form#bulk-form(method="POST", action=bulkRoute)
     .bulk-toolbar
       button#bulk-start(type="button") Bulk Edit
@@ -38,6 +38,10 @@
                     td #{item.tupleof[idx]}
               td
                 a.em-button.em-edit(href="#{editRoute}?id=#{item.id}") Edit
+                - foreach(link; extraLinks)
+                  - if(link.show is null || link.show(item))
+                    |  
+                    a.em-button.em-volunteer(href="#{link.route}?id=#{item.id}") #{link.label}
     script.
       (function () {
         var form = document.getElementById('bulk-form');

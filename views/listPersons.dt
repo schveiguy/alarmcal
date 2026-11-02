@@ -4,4 +4,4 @@ block content
   h1 Persons
 
   - import alarmcal.db;
-  - tableView!Person(persons, "/editPerson", "/bulkEditPerson");
+  - tableView!Person(persons, "/editPerson", "/bulkEditPerson", [ExtraLink!Person("Volunteer hours", "/volunteer", (ref const Person p) => p.memberType == MemberType.student)]);

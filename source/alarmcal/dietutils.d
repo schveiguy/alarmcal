@@ -75,6 +75,35 @@ auto timePrinter(TimeOfDay tod)
     return TP(tod);
 }
 
+// An extra per-row button in a generic table view; shown only where `show` is null or returns true.
+struct ExtraLink(T)
+{
+    string label;
+    string route; // called with ?id=<row id>
+    bool function(ref const T) show;
+}
+
+// Format a duration in minutes as H:MM (96 -> "1:36").
+string minutesPrinter(int minutes)
+{
+    import std.format : format;
+    return format("%d:%02d", minutes / 60, minutes % 60);
+}
+
+// Longest message shown inline next to a name; the full text goes in a title attribute.
+enum maxInlineMessage = 20;
+
+// Truncate to at most maxInlineMessage characters (code points), adding an ellipsis on overflow.
+string truncateMessage(string msg)
+{
+    import std.range : walkLength, take;
+    import std.utf : byDchar;
+    import std.conv : to;
+    if(msg.byDchar.walkLength <= maxInlineMessage)
+        return msg;
+    return msg.byDchar.take(maxInlineMessage).to!string ~ "\u2026";
+}
+
 TimeOfDay parseTime(string input)
 {
     // split on colons

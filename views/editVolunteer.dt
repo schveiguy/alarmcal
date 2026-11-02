@@ -1,0 +1,28 @@
+extends layout
+block content
+  - import alarmcal.dietutils;
+  h1 Volunteer Hours for #{ev.title}
+  p.em-meta #{ev.start.date.datePrinter}
+  - if(rows.empty)
+    p No students have checked in to this event.
+  - else
+    form(method="POST", action="/performEditVolunteer")
+      input(type="hidden", name="event_id", value=(ev.id))
+      div.table-wrap
+        table.item-table
+          thead
+            tr
+              th Student
+              th Time (H:MM)
+          tbody
+            - foreach(minutes, p; rows)
+              tr
+                td #{p.name}
+                td
+                  select(name="minutes_#{p.id}")
+                    - foreach(m; 0 .. 16 * 4 + 1)
+                      option(value=(m * 15), selected=(m * 15 == minutes)) #{(m * 15).minutesPrinter}
+      .form-group
+        button(type="submit") Save
+        |  
+        a.em-button(href="/") Cancel

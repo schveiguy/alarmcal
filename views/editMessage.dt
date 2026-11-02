@@ -1,0 +1,17 @@
+extends layout
+block content
+  h1 Message for #{ev.title}
+  - if(response.length)
+    p You are about to change your response to <strong>#{response}</strong>. Update your message first if it no longer applies.
+  form(method="POST", action="/performRsvpMessage")
+    input(type="hidden", name="event_id", value=(ev.id))
+    input(type="hidden", name="response", value=(response))
+    input(type="hidden", name="style", value=(style))
+    .form-group
+      label(for="message") Note
+      br
+      input#message(type="text", name="message", value=(existing.message), maxlength="50", size="50", autofocus)
+    .form-group
+      button(type="submit") #{response.length ? "Save and continue" : "Save"}
+      |  
+      a.em-button(href="/") Cancel
