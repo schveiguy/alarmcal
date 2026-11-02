@@ -1,6 +1,6 @@
 extends layout
 block content
-  h1 Check in for events at #{location.name}
+  h1 Check in for events at #{location.name.length ? location.name : location.address}
   - foreach(ev; events)
     p #{ev[0].title}#{ev[1] ? " (already checked in)" : ""}
   p

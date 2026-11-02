@@ -77,8 +77,9 @@ struct Person
 struct Location
 {
     @primaryKey @autoIncrement int id;
-    string name;
-    string address;
+    string name; // empty for ad hoc locations
+    string address; // a street address, or an http(s):// URL for online meetings
+    @noform bool adhoc; // created by a single event (or series), hidden from the location list and event location choices
 }
 
 enum EventType {
@@ -146,7 +147,18 @@ T[] getDBEnumValues(T)() {
     auto db = openDB();
     DataSet!T ds;
     import std.array;
-    return db.fetch(select(ds).orderBy(ds.name)).array;
+    auto query = select(ds);
+    // ad hoc locations are not offered as common choices
+    static if(__traits(hasMember, T, "adhoc"))
+        query = query.where(ds.adhoc, " = ", false.param);
+    return db.fetch(query.orderBy(ds.name)).array;
+}
+
+/// If the given location id refers to an ad hoc location, return its address, otherwise an empty string.
+string getAdhocAddress(long id) {
+    auto db = openDB();
+    auto l = db.fetchUsingKey(Location.init, cast(int)id);
+    return l.adhoc ? l.address : "";
 }
 
 Database openDB()
@@ -247,6 +259,7 @@ void applyMigrations()
         makePersonEmailCaseInsensitive(),
         addPersonSlack(),
         addPersonEventVolunteerAndMessage(),
+        addLocationAdhoc(),
     ];
 
     auto db = openDB();
@@ -447,5 +460,12 @@ Migration addPersonEventVolunteerAndMessage() {
     result.name = __FUNCTION__;
     result.add(`ALTER TABLE PersonEvent ADD COLUMN volunteerMinutes INTEGER NOT NULL DEFAULT 0`);
     result.add(`ALTER TABLE PersonEvent ADD COLUMN message TEXT NOT NULL DEFAULT ''`);
+    return result;
+}
+
+Migration addLocationAdhoc() {
+    Migration result;
+    result.name = __FUNCTION__;
+    result.add(`ALTER TABLE Location ADD COLUMN adhoc INTEGER NOT NULL DEFAULT 0`);
     return result;
 }

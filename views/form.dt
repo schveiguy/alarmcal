@@ -1,5 +1,6 @@
 - import alarmcal.formudas;
 - import alarmcal.dietutils;
+- import alarmcal.db : getAdhocAddress;
 - import sqlbuilder.uda;
 - import std.traits;
 - import std.datetime;
@@ -19,9 +20,24 @@
       option(value=v, selected=(defaultVal == v)) #{v}
 
 - void formFieldDBEnum(T)(string name, string prefix, T[] options, long defaultVal)
+  - enum hasAdhoc = __traits(hasMember, T, "adhoc");
+  - string adhocAddr = "";
+  - static if(hasAdhoc)
+    - adhocAddr = getAdhocAddress(defaultVal);
   select(name="#{prefix}#{name}")
+    - static if(hasAdhoc)
+      option(value="-2", selected=(adhocAddr.length > 0)) Ad hoc location (enter address below)
     - foreach(v; options)
-      option(value=(v.id), selected=(defaultVal == v.id)) #{v.name}
+      option(value=(v.id), selected=(adhocAddr.length == 0 && defaultVal == v.id)) #{v.name}
+  - static if(hasAdhoc)
+    .adhoc-address(style=(adhocAddr.length ? "" : "display:none"))
+      input(type="text", name="#{prefix}adhoc_address", value=(adhocAddr), placeholder="Address, or https:// meeting link")
+    script.
+      (function () {
+        var g = document.currentScript.parentNode;
+        var sel = g.querySelector('select'), box = g.querySelector('.adhoc-address');
+        sel.addEventListener('change', function () { box.style.display = sel.value == '-2' ? '' : 'none'; });
+      })();
 
 - void formFieldDateTime(string name, string prefix, DateTime defaultVal)
   fieldset.datetime-group

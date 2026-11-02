@@ -373,6 +373,51 @@ Person[int] getPersonMap() {
     return result;
 }
 
+/// Value of an event's location_id form field meaning "create/update an ad hoc location from the address field".
+enum adhocLocationChoice = -2;
+
+bool isHttpUrl(string address) {
+    import std.algorithm : startsWith;
+    import std.string : strip, toLower;
+    auto a = address.strip.toLower;
+    return a.startsWith("http://") || a.startsWith("https://");
+}
+
+/// A link to the location: the address itself if it is a URL, otherwise a maps search.
+string locationLink(string address) {
+    import std.uri : encodeComponent;
+    import std.string : strip;
+    address = address.strip;
+    if(!address.length) return "";
+    return isHttpUrl(address) ? address : GoogleMapsBaseUrl ~ encodeComponent(address);
+}
+
+string locationDisplayName(Location l) {
+    if(l.name.length) return l.name;
+    return isHttpUrl(l.address) ? "Online meeting" : l.address;
+}
+
+int createAdhocLocation(string address) {
+    Location l;
+    l.address = address;
+    l.adhoc = true;
+    db.create(l);
+    infof("Created ad hoc location id:%s at '%s'", l.id, l.address);
+    return l.id;
+}
+
+/// Remove an ad hoc location once no event refers to it anymore.
+void deleteLocationIfUnused(int id) {
+    auto loc = db.fetchUsingKey(Location.init, id);
+    if(!loc.adhoc) return;
+    DataSet!Event eds;
+    long n = db.fetchOne(select(count(eds.id)).where(eds.location_id, " = ", id.param));
+    if(n == 0) {
+        db.erase(loc);
+        infof("Deleted unused ad hoc location id:%s", id);
+    }
+}
+
 Location[int] getLocationMap() {
     DataSet!Location ds;
     Location[int] result;
@@ -639,7 +684,6 @@ struct IndexViewModel {
     }
 
     EventAnalysis eventAnalysis(ref EventInfo ev) {
-        import std.uri : encodeComponent;
         auto loc = locations.get(ev.event.location_id, Location.init);
         auto memberTypes = ev.attendees.map!(att => people[att.person_id].memberType);
         auto retval = EventAnalysis(
@@ -648,9 +692,9 @@ struct IndexViewModel {
                 studentCount: cast(int)memberTypes.count(MemberType.student),
                 mentorCount: cast(int)memberTypes.count(MemberType.mentor),
                 parentCount: cast(int)memberTypes.count(MemberType.parent),
-                locName: loc.name,
+                locName: locationDisplayName(loc),
                 locAddr: loc.address,
-                locMapsUrl: loc.address.length ? GoogleMapsBaseUrl ~ encodeComponent(loc.address) : ""
+                locMapsUrl: locationLink(loc.address)
         );
         retval.adultCount = retval.mentorCount + retval.parentCount;
         retval.attendeeCount = retval.adultCount + retval.studentCount;
@@ -848,6 +892,16 @@ void performAddEvent(Request request, Output output) {
         else
             // no repeat days were selected, ignore.
             doRepeat = false;
+    }
+
+    if (e.location_id == adhocLocationChoice) {
+        import std.string : strip;
+        auto address = request.post.read("adhoc_address", "").strip;
+        if (address.length == 0) {
+            output.status = 400;
+            return output.messageRedirect("Error", "Please enter an address or URL for the ad hoc location");
+        }
+        e.location_id = createAdhocLocation(address);
     }
 
     // have everything we need, actually modify the database
@@ -1069,7 +1123,7 @@ void listLocationsRoute(Request request, Output output) {
     }
     import std.array;
     DataSet!Location ds;
-    auto locations = db.fetch(select(ds)).array;
+    auto locations = db.fetch(select(ds).where(ds.adhoc, " = ", false.param)).array;
     output.renderDiet!("listLocations.dt", currentUser, locations);
 }
 
@@ -1175,6 +1229,34 @@ void performEditEvent(Request request, Output output) {
         return output.messageRedirect("Invalid event", i"Invalid event id specified: $(e.id)".text);
     }
 
+    if (e.location_id == adhocLocationChoice) {
+        import std.string : strip;
+        auto address = request.post.read("adhoc_address", "").strip;
+        if (address.length == 0) {
+            output.status = 400;
+            return output.messageRedirect("Error", "Please enter an address or URL for the ad hoc location");
+        }
+        // edit the existing ad hoc location in place only if no other event (e.g. in the same series) uses it
+        auto oldLoc = db.fetchUsingKey(Location.init, existing.location_id);
+        bool reuse = false;
+        if (oldLoc.adhoc) {
+            DataSet!Event lds;
+            long others = db.fetchOne(select(count(lds.id))
+                .where(lds.location_id, " = ", oldLoc.id.param, " AND ", lds.id, " != ", e.id.param));
+            reuse = others == 0;
+        }
+        if (reuse) {
+            if (oldLoc.address != address) {
+                infof("Updated ad hoc location id:%s from '%s' to '%s' by %s", oldLoc.id, oldLoc.address, address, currentUser.name);
+                oldLoc.address = address;
+                db.save(oldLoc);
+            }
+            e.location_id = oldLoc.id;
+        } else {
+            e.location_id = createAdhocLocation(address);
+        }
+    }
+
     if (!existing.tag_id.isNull && request.post.read("apply_to", "this") == "subsequent") {
         int rootId = existing.tag_id.get;
         auto duration = e.end - e.start;
@@ -1205,6 +1287,8 @@ void performEditEvent(Request request, Output output) {
     db.save(e);
     sendEventEmail(e, "Event has been modified.", isAttending: true);
     infof("Updated event '%s' (id:%s) starting %s, by %s", e.title, e.id, e.start, currentUser.name);
+    if (existing.location_id != e.location_id)
+        deleteLocationIfUnused(existing.location_id);
 
     output.redirect("/");
 }
@@ -1219,7 +1303,7 @@ void deleteEventForm(Request request, Output output) {
     static struct params { int id; }
     auto p = request.get.extract!params;
     auto item = db.fetchUsingKey!Event(p.id);
-    auto locationName = db.fetchUsingKey!Location(item.location_id).name;
+    auto locationName = locationDisplayName(db.fetchUsingKey!Location(item.location_id));
     DataSet!PersonEvent pesds;
     auto rsvps = db.fetch(select(pesds).where(pesds.event_id, " = ", item.id.param)).array;
     auto personMap = getPersonMap();
@@ -1255,6 +1339,7 @@ void performDeleteEvent(Request request, Output output) {
         sendEventEmail(ev, "The event has been removed from the calendar", isAttending: false);
         db.perform(removeFrom(pes.tableDef).where(pes.event_id, " = ", ev.id.param));
         db.erase(ev);
+        deleteLocationIfUnused(ev.location_id);
         infof("Deleted event '%s' (id:%s) starting %s, by %s", ev.title, ev.id, ev.start, currentUser.name);
     }
 
