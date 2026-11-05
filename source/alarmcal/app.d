@@ -1585,6 +1585,7 @@ void performEditVolunteer(Request request, Output output) {
 @endpoint
 @getRoute!"/checkIn"
 void checkIn(Request request, Output output) {
+    import std.format;
     static struct params {
         @(form.optional) int location_id = -1;
         @(form.optional) int event_id = -1;
@@ -1592,13 +1593,12 @@ void checkIn(Request request, Output output) {
     }
     DataSet!PersonEvent ds;
     auto p = request.get.extract!params;
+    auto today = cast(Date)getTime();
     if(p.location_id != -1) {
         // The person is checking in to all events today at this location
-        auto today = cast(Date)getTime();
         auto bq = select().where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.location_id) = $(p.location_id) AND date($(ds.event.start)) = $(today) AND $(ds.attending) = $(true)");
         auto eventInfo = db.fetchOne(bq.select(count(ds.id), exprCol!(Nullable!long)("SUM(", ds.attendanceRecorded, ")")));
         if(eventInfo[0] == 0) {
-            import std.format;
             return output.messageRedirect("Invalid checkin", format("No events at location %s, please RSVP for an event here before attempting to check in.", db.fetchUsingKey!Location(p.location_id).name));
         }
         else if(eventInfo[1] == eventInfo[0]) {
@@ -1616,8 +1616,12 @@ void checkIn(Request request, Output output) {
     } else if(p.event_id != -1) {
         auto events = db.fetch(select(ds.event, ds.attendanceRecorded, ds.event.location).where(i"$(ds.person_id) = $(currentUser.id) AND $(ds.event.id) = $(p.event_id) AND $(ds.attending) = $(true)")).array;
         if(events.length == 0) {
-            import std.format;
             return output.messageRedirect("Invalid checkin", format("You have not signed up for event %s, please RSVP before attempting to check in.", db.fetchUsingKey!Event(p.event_id).title));
+        }
+        if(events[0][0].start.date > today)
+        {
+            // You cannot check in for an event that is in the future
+            return output.messageRedirect("Invalid checkin", format("Event %s is in the future, please wait for the event to start before checking in.", events[0][0].title));
         }
         if(events[0][1]) {
             // already checked in.
